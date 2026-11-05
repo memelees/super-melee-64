@@ -5,6 +5,36 @@ import json, os, signal, shutil, subprocess, sys, tempfile, threading, time
 class SetupCancelled(RuntimeError):
     pass
 
+def pid_is_running(pid):
+    """Check lock ownership without ever sending a Windows console event."""
+    if pid<=0:return False
+    if os.name=='nt':
+        import ctypes
+        from ctypes import wintypes
+        if pid>0xffffffff:return False
+        kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+        kernel.OpenProcess.argtypes=(wintypes.DWORD,wintypes.BOOL,wintypes.DWORD)
+        kernel.OpenProcess.restype=wintypes.HANDLE
+        kernel.WaitForSingleObject.argtypes=(wintypes.HANDLE,wintypes.DWORD)
+        kernel.WaitForSingleObject.restype=wintypes.DWORD
+        kernel.CloseHandle.argtypes=(wintypes.HANDLE,)
+        kernel.CloseHandle.restype=wintypes.BOOL
+        handle=kernel.OpenProcess(0x00100000,False,pid) # SYNCHRONIZE only
+        if not handle:
+            error=ctypes.get_last_error()
+            if error==87:return False # ERROR_INVALID_PARAMETER: no such PID
+            if error==5:return True # Access denied: preserve this lock.
+            raise ctypes.WinError(error)
+        try:
+            status=kernel.WaitForSingleObject(handle,0)
+            if status==258:return True # WAIT_TIMEOUT: still running
+            if status==0:return False # WAIT_OBJECT_0: exited
+            raise ctypes.WinError(ctypes.get_last_error())
+        finally:kernel.CloseHandle(handle)
+    try:os.kill(pid,0)
+    except (ProcessLookupError,OverflowError):return False
+    return True
+
 def atomic_json(path, value):
     path=Path(path);path.parent.mkdir(parents=True,exist_ok=True)
     temporary=path.with_name(path.name+'.tmp')
@@ -65,10 +95,11 @@ class Session:
         self.work.mkdir(parents=True,exist_ok=True)
         if self.lock.exists():
             try:
-                pid=int(self.lock.read_text());os.kill(pid,0)
-            except (ValueError,ProcessLookupError):self.lock.unlink(missing_ok=True)
+                pid=int(self.lock.read_text());active=pid_is_running(pid)
+            except (ValueError,ProcessLookupError):active=False
             except PermissionError:raise RuntimeError('Another setup process owns this build folder.')
-            else:raise RuntimeError('Setup is already running for this build folder (PID %d).'%pid)
+            if active:raise RuntimeError('Setup is already running for this build folder (PID %d).'%pid)
+            self.lock.unlink(missing_ok=True)
         descriptor=os.open(self.lock,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
         with os.fdopen(descriptor,'w') as out:out.write(str(os.getpid()))
         if not self.external_cancel:self.cancel_file.unlink(missing_ok=True)

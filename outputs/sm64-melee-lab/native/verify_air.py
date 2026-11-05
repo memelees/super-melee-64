@@ -169,7 +169,7 @@ def main():
         folder = Path(folder)
         test, binary = folder / 'air.c', folder / 'air'
         test.write_text(C_PREFIX + '\n' + reference + '\n' + C_TEST)
-        subprocess.run(['clang', '-std=c11', '-Wall', '-Wextra', '-Werror', '-I', str(HERE), str(test), '-o', str(binary)], check=True)
+        subprocess.run(['clang', '-std=c11', '-Wall', '-Wextra', '-Werror', '-I', str(HERE), str(test), '-lm', '-o', str(binary)], check=True)
         result = subprocess.run([str(binary)], capture_output=True, text=True, check=True)
     receipt = dict(passed=True, output=result.stdout.strip(),
                    reference=dict(checkout=str(source), commit=commit, file=reference_file, line=line,

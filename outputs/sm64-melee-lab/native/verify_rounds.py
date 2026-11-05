@@ -225,7 +225,7 @@ def main():
         folder = Path(folder)
         test, binary = folder / "rounds.c", folder / "rounds"
         test.write_text(PREFIX + wave + plan + placement + rounds + TEST)
-        subprocess.run(["clang", "-std=c11", "-Wall", "-Wextra", "-Werror", "-I", str(HERE), str(test), "-o", str(binary)], check=True)
+        subprocess.run(["clang", "-std=c11", "-Wall", "-Wextra", "-Werror", "-I", str(HERE), str(test), "-lm", "-o", str(binary)], check=True)
         result = subprocess.run([str(binary)], capture_output=True, text=True, check=True)
         input_file, input_binary = folder / "input.c", folder / "input"
         input_file.write_text(input_source)

@@ -367,7 +367,7 @@ def main():
         folder = Path(folder)
         source, binary = folder / "test.c", folder / "test"
         source.write_text(SOURCE)
-        subprocess.run(["clang", "-std=c11", "-Wall", "-Wextra", "-Werror", "-I", str(HERE), str(source), "-o", str(binary)], check=True)
+        subprocess.run(["clang", "-std=c11", "-Wall", "-Wextra", "-Werror", "-I", str(HERE), str(source), "-lm", "-o", str(binary)], check=True)
         result = subprocess.run([str(binary)], capture_output=True, text=True, check=True)
         npc_source = (HERE / "sm64_npcs.inc").read_text()
         plan_source = npc_source[npc_source.index("typedef struct {unsigned waves"):npc_source.index("static void smb_encounter_enter")]

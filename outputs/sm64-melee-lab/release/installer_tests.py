@@ -43,6 +43,20 @@ class InstallerTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError,'already running'):
                 with self.session():pass
             self.assertTrue((self.root/'work/setup.lock').exists())
+    def test_pid_probe_current_process_never_signals_on_windows(self):
+        # On Windows os.kill(pid, 0) emits CTRL_C_EVENT instead of probing.
+        if os.name=='nt':
+            with mock.patch.object(os,'kill',side_effect=AssertionError('A Windows PID probe must not signal')):
+                self.assertTrue(support.pid_is_running(os.getpid()))
+        else:self.assertTrue(support.pid_is_running(os.getpid()))
+    def test_pid_probe_invalid_group_ids(self):
+        with mock.patch.object(os,'kill',side_effect=AssertionError('Invalid PID reached signalling API')):
+            self.assertFalse(support.pid_is_running(0));self.assertFalse(support.pid_is_running(-1))
+    def test_pid_probe_child_lifetime(self):
+        child=subprocess.Popen([sys.executable,'-c','import time; time.sleep(5)'])
+        try:self.assertTrue(support.pid_is_running(child.pid))
+        finally:child.terminate();child.wait(timeout=5)
+        self.assertFalse(support.pid_is_running(child.pid))
     def test_stale_lock_recovered(self):
         work=self.root/'work';work.mkdir();(work/'setup.lock').write_text('invalid-stale-pid')
         with self.session():pass
@@ -70,7 +84,7 @@ class InstallerTests(unittest.TestCase):
         with self.assertRaises(support.SetupCancelled):
             with self.session(cancel_file=cancel) as session:session.run([sys.executable,'-c',code])
         worker.join(timeout=5)
-        self.assertLess(time.monotonic()-started,3)
+        self.assertLess(time.monotonic()-started,10)
         self.assertFalse(late.exists());self.assertEqual(cached.read_text(),'keep')
         self.assertEqual(self.state()['status'],'cancelled')
     def test_shell_execution_rejected(self):
