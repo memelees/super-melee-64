@@ -1,0 +1,325 @@
+name: Import audited source (owner only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Exact release tag containing the owner-uploaded source ZIP
+        required: true
+        type: string
+      asset_name:
+        description: Exact source ZIP asset filename
+        required: true
+        type: string
+      sha256:
+        description: Locally audited source ZIP SHA-256 (64 lowercase hex digits)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: initial-source-import
+  cancel-in-progress: false
+
+jobs:
+  import:
+    if: github.repository == 'memelees/super-melee-64' && github.actor == 'memelees' && github.triggering_actor == 'memelees' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          fetch-depth: 1
+          submodules: false
+          lfs: false
+      - name: Verify exact release asset and import source without executing it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RELEASE_TAG: ${{ inputs.release_tag }}
+          SOURCE_ASSET_NAME: ${{ inputs.asset_name }}
+          SOURCE_SHA256: ${{ inputs.sha256 }}
+        shell: bash
+        run: |
+          python3 - <<'PYTHON'
+          """Trusted importer validator: standard library only; never imports archive code."""
+          from pathlib import Path, PurePosixPath
+          import base64
+          import hashlib
+          import io
+          import json
+          import re
+          import stat
+          import struct
+          import zipfile
+          import zlib
+          import xml.etree.ElementTree as ET
+
+          MANIFEST = 'PUBLIC-SOURCE-MANIFEST.json'
+          BASE = 'outputs/sm64-melee-lab/'
+          BOOTSTRAP = BASE + 'release/SmashRoyale-bootstrap.zip'
+          PNG = BASE + 'branding/Super Melee 64 Rendered.png'
+          SVG = BASE + 'branding/Super Melee 64.svg'
+          MAX_ARCHIVE = 64 * 1024 * 1024
+          MAX_TOTAL = 128 * 1024 * 1024
+          MAX_MEMBER = 16 * 1024 * 1024
+          SHA = re.compile(r'[0-9a-f]{64}')
+          SECRET = [re.compile(value) for value in (
+              r'\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{30,})\b',
+              r'\b(?:AKIA|ASIA)[A-Z0-9]{16}\b', r'\bxox[baprs]-[A-Za-z0-9-]{20,}\b',
+              r'-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY-----',
+              r'https?://[^\s/:@]+:[^\s/@]{12,}@', r'/(?:Users|home)/[A-Za-z0-9_. -]+/',
+          )]
+
+
+          def require(condition, reason):
+              if not condition:
+                  raise ValueError(reason)
+
+
+          def safe_name(name):
+              require(isinstance(name, str) and 0 < len(name) <= 240 and name.isascii(), 'Invalid member name')
+              require(re.fullmatch(r'[A-Za-z0-9_+./ -]+', name) is not None, 'Nonportable member name')
+              parts = name.split('/')
+              require(not name.startswith('/') and all(part and part not in {'.', '..'} for part in parts), 'Unsafe member path')
+              for part in parts:
+                  require(not part.endswith((' ', '.')) and not part.startswith(' '), 'Ambiguous member path')
+                  require(part.casefold() not in {'.git', '.gitmodules', '.gitattributes', '.lfsconfig', '.env'}, 'Git control/environment path rejected')
+                  require(part.split('.')[0].upper() not in {'CON', 'PRN', 'AUX', 'NUL', *('COM'+str(i) for i in range(1,10)), *('LPT'+str(i) for i in range(1,10))}, 'Reserved device name')
+              return PurePosixPath(name)
+
+
+          def object_pairs(pairs):
+              result = {}
+              for name, value in pairs:
+                  require(name not in result, 'Duplicate JSON key')
+                  result[name] = value
+              return result
+
+
+          def parse_json(data):
+              return json.loads(data.decode('utf-8'), object_pairs_hook=object_pairs)
+
+
+          def select_release(releases, tag):
+              """Resolve one owner-authored draft/published release without a Git tag."""
+              require(isinstance(tag, str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,79}', tag), 'Invalid exact release tag')
+              require(isinstance(releases, list) and len(releases) <= 100 and
+                      all(isinstance(item, dict) for item in releases), 'Invalid bounded release-list response')
+              choices = [item for item in releases if item.get('tag_name') == tag]
+              require(len(choices) == 1, 'Expected one exact release tag among the first 100 releases, including drafts')
+              release = choices[0]
+              require(type(release.get('draft')) is bool and
+                      isinstance(release.get('author'), dict) and
+                      release['author'].get('login') == 'memelees', 'Source release must be authored by the owner')
+              return release
+
+
+          def text(data):
+              require(b'\0' not in data, 'Binary source payload rejected')
+              value = data.decode('utf-8')
+              require(not any(pattern.search(value) for pattern in SECRET), 'Credential or personal absolute path rejected')
+              return value
+
+
+          def members(data, count=2000, maximum=MAX_MEMBER):
+              require(len(data) <= MAX_ARCHIVE, 'ZIP exceeds compressed size limit')
+              with zipfile.ZipFile(io.BytesIO(data)) as archive:
+                  require(not archive.comment and len(archive.infolist()) <= count, 'ZIP comment/member limit rejected')
+                  files = {};folded = set();total = 0
+                  for info in archive.infolist():
+                      safe_name(info.filename)
+                      require(not info.is_dir() and info.filename not in files and info.filename.casefold() not in folded, 'Duplicate/directory/case-colliding ZIP member')
+                      require(not info.comment and not info.extra and not info.flag_bits & 1, 'ZIP metadata/encryption rejected')
+                      mode = info.external_attr >> 16
+                      require(stat.S_IFMT(mode) in {0, stat.S_IFREG} and stat.S_IMODE(mode) in {0, 0o600, 0o644, 0o755}, 'Nonregular/unsafe ZIP member permissions')
+                      require(info.compress_type in {zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED}, 'Unsupported ZIP compression')
+                      total += info.file_size
+                      require(0 <= info.file_size <= maximum and total <= MAX_TOTAL, 'ZIP expansion size limit rejected')
+                      payload = archive.read(info)
+                      require(len(payload) == info.file_size, 'ZIP size mismatch')
+                      files[info.filename] = (payload, 0o755 if mode & 0o111 else 0o644)
+                      folded.add(info.filename.casefold())
+              return files
+
+
+          def allowed_source(name):
+              p = safe_name(name)
+              if name in {MANIFEST, '.gitignore', 'README.md', 'LICENSE', 'LICENSING.md', 'SECURITY.md', 'CONTRIBUTING.md'}:
+                  return True
+              if len(p.parts) == 2 and p.parts[0] == 'docs' and p.suffix == '.md':
+                  return True
+              if len(p.parts) == 3 and p.parts[:2] in {('.github','workflows'), ('.github','ISSUE_TEMPLATE')}:
+                  return p.suffix in ({'.yml', '.yaml'} if p.parts[1] == 'workflows' else {'.md'})
+              if not name.startswith(BASE):
+                  return False
+              rest = PurePosixPath(name[len(BASE):])
+              if len(rest.parts) == 1:
+                  return rest.suffix in {'.txt', '.html'}
+              if len(rest.parts) != 2:
+                  return False
+              folder = rest.parts[0]
+              if folder == 'native':
+                  return rest.suffix in {'.py', '.c', '.cpp', '.h', '.inc', '.m', '.patch', '.json'}
+              if folder == 'release':
+                  return name == BOOTSTRAP or rest.suffix in {'.py', '.ps1', '.cpp', '.swift', '.txt', '.command', '.cmd', '.vbs'}
+              if folder == 'branding':
+                  return name in {PNG, SVG, BASE+'branding/Design prompt.txt'}
+              if folder == 'verification':
+                  return rest.name in {'public-source-audit.json', 'beta-acceptance.json'}
+              return name == BASE+'mod/main.lua'
+
+
+          def bootstrap(data):
+              files = members(data, count=1000, maximum=8*1024*1024)
+              manifest_name = 'smash-royale-bootstrap.json'
+              require(manifest_name in files, 'Missing bootstrap manifest')
+              info = parse_json(files[manifest_name][0])
+              require(info.get('revision') == 'super-melee64-adapter-v1' and info.get('source_only') is True and info.get('game_assets_included') is False and info.get('engine_source_included') is False, 'Unsupported source bootstrap identity')
+              hashes = info.get('files')
+              require(isinstance(hashes, dict) and set(files) == {manifest_name, *hashes}, 'Bootstrap manifest mismatch')
+              for name, digest in hashes.items():
+                  p = safe_name(name)
+                  allowed = ((len(p.parts) == 3 and p.parts[:2] == ('tools','melee3d') and p.suffix == '.py') or
+                             (len(p.parts) >= 3 and p.parts[:2] == ('native','mac') and p.suffix in {'.c','.cpp','.h','.inc','.json','.patch','.manifest','.md'}) or
+                             name in {'BOOTSTRAP-NOTICE.txt','COPYING-port.txt','UPSTREAM-LICENSING.txt','config/GALE01/symbols.txt'})
+                  require(allowed and isinstance(digest, str) and SHA.fullmatch(digest), 'Non-source bootstrap member')
+                  require(hashlib.sha256(files[name][0]).hexdigest() == digest, 'Changed bootstrap member')
+                  text(files[name][0])
+              text(files[manifest_name][0])
+
+
+          def png(data):
+              require(data.startswith(b'\x89PNG\r\n\x1a\n'), 'Invalid original logo')
+              at = 8;seen = []
+              while at < len(data):
+                  require(at+12 <= len(data), 'Truncated logo')
+                  size = struct.unpack_from('>I', data, at)[0]
+                  require(at+12+size <= len(data), 'Truncated logo chunk')
+                  kind = data[at+4:at+8];payload = data[at+8:at+8+size]
+                  require(zlib.crc32(kind+payload) == struct.unpack_from('>I',data,at+8+size)[0], 'Invalid logo checksum')
+                  require(kind not in {b'tEXt',b'zTXt',b'iTXt',b'eXIf',b'tIME'}, 'Logo author/time metadata rejected')
+                  seen.append(kind);at += 12+size
+              require(seen and seen[0] == b'IHDR' and seen[-1] == b'IEND' and b'IDAT' in seen, 'Incomplete original logo')
+
+
+          def validate(data, expected_sha):
+              require(isinstance(expected_sha, str) and SHA.fullmatch(expected_sha), 'Provide exact lowercase SHA-256')
+              require(hashlib.sha256(data).hexdigest() == expected_sha, 'Source artifact SHA-256 mismatch')
+              files = members(data)
+              require(MANIFEST in files, 'Missing public source manifest')
+              info = parse_json(files[MANIFEST][0])
+              require(info.get('format') == 1 and info.get('source_only') is True and info.get('git_history_included') is False and info.get('private_source_commit_metadata_included') is False, 'Source export history/privacy declaration mismatch')
+              hashes = info.get('files')
+              require(isinstance(hashes, dict) and set(files) == {MANIFEST,*hashes}, 'Source manifest/file mismatch')
+              required = {'README.md','LICENSE','LICENSING.md','SECURITY.md','CONTRIBUTING.md',BOOTSTRAP,
+                          '.github/workflows/source-checks.yml', BASE+'native/bridge_protocol.h',
+                          BASE+'native/title_lettering.py', BASE+'verification/public-source-audit.json'}
+              require(required <= set(files), 'Incomplete reviewed source export')
+              for name, (payload, _) in files.items():
+                  require(allowed_source(name), 'Unexpected source/game/metadata path')
+                  if name != MANIFEST:
+                      require(isinstance(hashes[name], str) and SHA.fullmatch(hashes[name]) and hashlib.sha256(payload).hexdigest() == hashes[name], 'Source member digest mismatch')
+                  if name == BOOTSTRAP:
+                      bootstrap(payload)
+                  elif name == PNG:
+                      png(payload)
+                  else:
+                      value = text(payload)
+                      if name == SVG:
+                          tree = ET.fromstring(payload)
+                          require(not any(node.tag.rsplit('}',1)[-1] in {'metadata','namedview'} for node in tree.iter()), 'SVG editor metadata rejected')
+                          for match in re.finditer(r'data:image/png;base64,([A-Za-z0-9+/=\r\n]+)', value):
+                              png(base64.b64decode(match[1], validate=False))
+              evidence = parse_json(files[BASE+'verification/public-source-audit.json'][0])
+              require(evidence.get('passed') is True and evidence.get('findings') == [] and evidence.get('legal_clearance_claimed') is False, 'Source privacy/content audit did not pass')
+              return files
+
+          import os
+          import subprocess
+
+
+          def command(*args, **kwargs):
+              return subprocess.check_output(list(args), **kwargs)
+
+
+          def main():
+              require(os.environ.get('GITHUB_REPOSITORY') == 'memelees/super-melee-64' and
+                      os.environ.get('GITHUB_ACTOR') == 'memelees' and
+                      os.environ.get('GITHUB_TRIGGERING_ACTOR', 'memelees') == 'memelees' and
+                      os.environ.get('GITHUB_REF') == 'refs/heads/main', 'Importer requires the owner and main branch of the intended repository')
+              tag = os.environ['SOURCE_RELEASE_TAG']
+              asset_name = os.environ['SOURCE_ASSET_NAME']
+              expected = os.environ['SOURCE_SHA256']
+              require(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,79}', tag), 'Invalid release tag')
+              require(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.zip', asset_name), 'Invalid exact source ZIP asset name')
+              require(SHA.fullmatch(expected), 'Provide the locally audited artifact SHA-256')
+              repo = 'memelees/super-melee-64'
+              # Listing with this repository's write token includes its drafts, whose
+              # tag_name may not yet have a Git ref. GET releases/tags/{tag} can 404 there.
+              # Keep lookup bounded, require one exact tag, and never create/publish a tag.
+              releases = parse_json(command('gh','api','--hostname','github.com','--method','GET',
+                                            f'repos/{repo}/releases?per_page=100'))
+              metadata = select_release(releases, tag)
+              choices = [item for item in metadata.get('assets', []) if item.get('name') == asset_name]
+              require(len(choices) == 1, 'Expected one exact release asset')
+              asset = choices[0]
+              require(asset.get('uploader', {}).get('login') == 'memelees' and asset.get('state') == 'uploaded', 'Source asset must be uploaded by the owner')
+              asset_id = asset.get('id');size = asset.get('size')
+              require(type(asset_id) is int and asset_id > 0 and type(size) is int and 0 < size <= MAX_ARCHIVE, 'Invalid source asset metadata')
+              temporary = Path(os.environ['RUNNER_TEMP'])/'source-import'
+              temporary.mkdir(mode=0o700, parents=True, exist_ok=False)
+              archive = temporary/'source.zip'
+              with archive.open('xb') as target:
+                  subprocess.run(['gh','api','--hostname','github.com',f'repos/{repo}/releases/assets/{asset_id}',
+                                  '-H','Accept: application/octet-stream'], stdout=target, check=True)
+              require(archive.stat().st_size == size, 'Downloaded source asset size mismatch')
+              files = validate(archive.read_bytes(), expected)
+              # Nothing from the source artifact has been imported or executed. Only now
+              # may validated source files be written into a clean starter repository.
+              root = Path(os.environ['GITHUB_WORKSPACE']).resolve()
+              require(command('git','status','--porcelain=v1','--untracked-files=all',cwd=root) == b'', 'Starter repository must be clean')
+              tracked = command('git','ls-files','-z',cwd=root).decode().split('\0')[:-1]
+              starter = {'README.md','LICENSE','.gitignore'}
+              require(all(name in starter or name.startswith('.github/workflows/') for name in tracked), 'Refusing to overwrite a repository that already contains source')
+              skipped = [];imported = []
+              for name, (payload, mode) in sorted(files.items()):
+                  if name.startswith('.github/workflows/'):
+                      skipped.append((name, hashlib.sha256(payload).hexdigest()))
+                      continue
+                  target = root/name
+                  cursor = target
+                  while cursor != root:
+                      require(not cursor.is_symlink(), 'Refusing a symlink in the target repository')
+                      cursor = cursor.parent
+                  require(not target.exists() or target.is_file(), 'Target path is not a regular file')
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  target.write_bytes(payload);target.chmod(mode)
+                  imported.append(name)
+              require(imported, 'Nothing to import')
+              subprocess.run(['git','add','-f','--',*imported],cwd=root,check=True)
+              staged = command('git','diff','--cached','--name-only','-z',cwd=root).decode().split('\0')[:-1]
+              require(set(staged) <= set(imported) and all(not name.startswith('.github/workflows/') for name in staged), 'Unexpected staged path')
+              identity = 'Memelees'
+              email = '347886617+memelees@users.noreply.github.com'
+              clean_env = dict(os.environ, GIT_AUTHOR_NAME=identity, GIT_AUTHOR_EMAIL=email,
+                               GIT_COMMITTER_NAME=identity, GIT_COMMITTER_EMAIL=email)
+              subprocess.run(['git','-c','core.hooksPath=/dev/null','-c','commit.gpgsign=false',
+                              'commit','--no-verify','-m','Import audited Super Melee 64 source'],cwd=root,env=clean_env,check=True)
+              # A normal fast-forward push rejects a concurrent branch change. Never
+              # force, rewrite prior commits, or carry private local Git configuration.
+              subprocess.run(['git','-c','core.hooksPath=/dev/null','push','origin','HEAD:refs/heads/main'],cwd=root,check=True)
+              summary = ['## Audited source imported', f'- Artifact SHA-256: `{expected}`',
+                         f'- Imported source files: {len(imported)}',
+                         '- No artifact code was executed; no Git history was imported.',
+                         '- All workflow files were preserved and excluded from the commit.',
+                         '- Paste the reviewed source-checks.yml in the browser to enable CI.']
+              summary += [f'- Preserved for manual review: `{name}` (SHA-256 `{digest}`)' for name,digest in skipped]
+              Path(os.environ['GITHUB_STEP_SUMMARY']).write_text('\n'.join(summary)+'\n')
+
+
+          if __name__ == '__main__':
+              main()
+          PYTHON
