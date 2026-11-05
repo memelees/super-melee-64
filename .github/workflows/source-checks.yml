@@ -40,10 +40,16 @@ jobs:
           python3 outputs/sm64-melee-lab/native/export_public_source.py --self-test
           python3 outputs/sm64-melee-lab/native/verify_repository.py
           python3 outputs/sm64-melee-lab/native/verify_bootstrap.py
+      - name: Get the pinned public co-op source for geometry and packet checks
+        run: |
+          git init "$RUNNER_TEMP/coop-stock"
+          git -C "$RUNNER_TEMP/coop-stock" remote add origin https://github.com/coop-deluxe/sm64coopdx.git
+          git -C "$RUNNER_TEMP/coop-stock" fetch --depth 1 origin 8cd6e5977d9f920d51ca71f2c61801d019ed79c6
+          git -C "$RUNNER_TEMP/coop-stock" checkout --detach FETCH_HEAD
       - name: Verify actual round/input code and campaign ownership
         run: |
           python3 outputs/sm64-melee-lab/native/verify_rounds.py
-          python3 outputs/sm64-melee-lab/native/verify_npc_placement.py
+          python3 outputs/sm64-melee-lab/native/verify_npc_placement.py --surface-header "$RUNNER_TEMP/coop-stock/include/surface_terrains.h"
           python3 outputs/sm64-melee-lab/native/verify_coop_campaign.py
           python3 outputs/sm64-melee-lab/native/verify_release.py --campaign-only
       - name: Get the pinned public SM64 source for the air reference
@@ -54,12 +60,6 @@ jobs:
           git -C "$RUNNER_TEMP/sm64-stock" checkout --detach FETCH_HEAD
       - name: Compare air rules against the unmodified stock routine
         run: python3 outputs/sm64-melee-lab/native/verify_air.py --stock-source "$RUNNER_TEMP/sm64-stock"
-      - name: Get the pinned public co-op source for packet safety checks
-        run: |
-          git init "$RUNNER_TEMP/coop-stock"
-          git -C "$RUNNER_TEMP/coop-stock" remote add origin https://github.com/coop-deluxe/sm64coopdx.git
-          git -C "$RUNNER_TEMP/coop-stock" fetch --depth 1 origin 8cd6e5977d9f920d51ca71f2c61801d019ed79c6
-          git -C "$RUNNER_TEMP/coop-stock" checkout --detach FETCH_HEAD
       - name: Verify packet routines with address and undefined behavior sanitizers
         run: python3 outputs/sm64-melee-lab/native/verify_network_safety.py --source "$RUNNER_TEMP/coop-stock"
 
