@@ -1,0 +1,65 @@
+name: Update installer download buttons
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: installer-download-buttons
+  cancel-in-progress: false
+
+jobs:
+  update-buttons:
+    if: github.repository == 'memelees/super-melee-64' && github.actor == 'memelees' && github.triggering_actor == 'memelees'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      GIT_TERMINAL_PROMPT: '0'
+      GIT_AUTHOR_NAME: Memelees
+      GIT_AUTHOR_EMAIL: 347886617+memelees@users.noreply.github.com
+      GIT_COMMITTER_NAME: Memelees
+      GIT_COMMITTER_EMAIL: 347886617+memelees@users.noreply.github.com
+    steps:
+      - name: Check out main and all reachable history without saved credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Select the newest complete public installer release
+        run: python3 outputs/sm64-melee-lab/native/update_download_links.py --write
+      - name: Audit the source and complete public history
+        run: python3 outputs/sm64-melee-lab/native/verify_repository.py
+      - name: Commit and publish only the download block and manifest update
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet -- README.md PUBLIC-SOURCE-MANIFEST.json; then
+            echo 'Installer download buttons are already current.'
+            exit 0
+          fi
+          git add -- README.md
+          if test -f PUBLIC-SOURCE-MANIFEST.json; then
+            git add -- PUBLIC-SOURCE-MANIFEST.json
+          fi
+          git commit -m 'Update installer downloads to the newest published release'
+          python3 outputs/sm64-melee-lab/native/verify_repository.py
+          python3 - <<'PY'
+          import base64
+          import os
+          import subprocess
+          environment = os.environ.copy()
+          token = environment.pop('GH_TOKEN')
+          credential = base64.b64encode(('x-access-token:' + token).encode()).decode()
+          environment['GIT_CONFIG_COUNT'] = '1'
+          environment['GIT_CONFIG_KEY_0'] = 'http.https://github.com/.extraheader'
+          environment['GIT_CONFIG_VALUE_0'] = 'AUTHORIZATION: basic ' + credential
+          subprocess.run(['git', 'push', 'origin', 'HEAD:main'], env=environment, check=True)
+          PY
