@@ -1,0 +1,899 @@
+{
+  "date": "2026-11-05T00:57:29+00:00",
+  "passed": true,
+  "complete": true,
+  "requested_groups": [
+    "stages",
+    "roster",
+    "features",
+    "network"
+  ],
+  "total_cases": 88,
+  "completed_cases": 88,
+  "cases": [
+    {
+      "name": "stage-00",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 22.0,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-01",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 22.63,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-02",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 22.55,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-03",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 24.66,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-04",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 25.23,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-05",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 23.89,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-06",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 24.04,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-07",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 24.06,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-08",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 23.76,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-09",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 24.1,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-10",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 23.64,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-11",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 24.13,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-12",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 23.79,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-13",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 24.45,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-14",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 23.5,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-15",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 23.57,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-16",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 23.62,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-17",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 23.47,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-18",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 22.91,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-19",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 22.77,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-20",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 22.83,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-21",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 22.37,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-22",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 23.47,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-23",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 21.3,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-24",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 23.42,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-25",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 22.49,
+      "failed_checks": []
+    },
+    {
+      "name": "stage-26",
+      "group": "stages",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 21.06,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-bowser",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.65,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-charizard",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.74,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-dedede",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.61,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-diddy",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.48,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-dk",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.71,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-drmario",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.69,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-falco",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.73,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-falcon",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.52,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-fox",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.54,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-gamewatch",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.68,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-ganondorf",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.89,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-iceclimbers",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.6,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-jigglypuff",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.58,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-kirby",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.72,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-link",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.82,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-lucas",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.63,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-luigi",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.69,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-mario",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.59,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-marth",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.57,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-mewtwo",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.61,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-ness",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.72,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-peach",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.73,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-pichu",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.67,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-pikachu",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.67,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-roy",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.85,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-samus",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 19.6,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-sheik",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.88,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-sonic",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.84,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-tails",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.66,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-wolf",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.6,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-yoshi",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.7,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-younglink",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 19.31,
+      "failed_checks": []
+    },
+    {
+      "name": "fighter-zelda",
+      "group": "roster",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.99,
+      "failed_checks": []
+    },
+    {
+      "name": "controller",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 37.8,
+      "failed_checks": [],
+      "fixture_setup_corrected": true,
+      "initial_failed_checks": [
+        "jump_sound_requested",
+        "native_sounds_resolved"
+      ],
+      "initial_exit_code": 1,
+      "correction": {
+        "reason": "Sound assertions require native sound tracing, which the initial controller case omitted.",
+        "arguments_added": [
+          "--sound-diagnostic"
+        ]
+      },
+      "initial_result_sha256": "ad46a5b9901b3b5b0e19e79b7804d2e1968d00dad0fc8a5d41d542c8bf7c88b3",
+      "corrected_result_sha256": "aff8073062ea786020a4417106a96684dde53756d59a26abc2a6807d04ff01c4"
+    },
+    {
+      "name": "camera-follow",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 24.2,
+      "failed_checks": []
+    },
+    {
+      "name": "camera-look",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 20.75,
+      "failed_checks": []
+    },
+    {
+      "name": "cannon",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 30.18,
+      "failed_checks": [],
+      "fixture_setup_corrected": true,
+      "initial_failed_checks": [
+        "host_cannon_aim",
+        "cannon_release_to_melee",
+        "native_cannon_flight"
+      ],
+      "initial_exit_code": 1,
+      "correction": {
+        "reason": "The isolated fresh save had a locked cannon. Unlocking test cannons permits the real firing path; ordinary stage tests still use earned progress.",
+        "arguments_added": [
+          "--all-stars"
+        ]
+      },
+      "initial_result_sha256": "661a41b0bfb69a8339bc9cbd2a15f5d165a379cc8cc46728cb2ee6d7dbf46af9",
+      "corrected_result_sha256": "61f8607c6459bf1053336425b3461e4c220ae6041975f72bdedfae9d5b859b4c"
+    },
+    {
+      "name": "enemy-throw",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 32.17,
+      "failed_checks": [],
+      "fixture_setup_corrected": true,
+      "initial_failed_checks": [
+        "native_recovery_available"
+      ],
+      "initial_exit_code": 1,
+      "correction": {
+        "reason": "The recovery assertion reads native input diagnostics, which the initial enemy-throw case omitted.",
+        "arguments_added": [
+          "--input-diagnostic"
+        ]
+      },
+      "initial_result_sha256": "734863f462db36567e96106441b881d78fe84065cf2e95a538bfd1b5f08858f9",
+      "corrected_result_sha256": "54b44f682658c55f38dd5b597c7d84b88419033558b0aaa9a061c64a8ac9dc6f"
+    },
+    {
+      "name": "grab",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 20.84,
+      "failed_checks": []
+    },
+    {
+      "name": "bowser-tail",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 32.22,
+      "failed_checks": []
+    },
+    {
+      "name": "shield",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 18.67,
+      "failed_checks": []
+    },
+    {
+      "name": "arrow-world-impact",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 31.46,
+      "failed_checks": []
+    },
+    {
+      "name": "bomb-world-impact",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 31.5,
+      "failed_checks": []
+    },
+    {
+      "name": "steep-slide",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 23.56,
+      "failed_checks": []
+    },
+    {
+      "name": "moving-platform",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 17.81,
+      "failed_checks": []
+    },
+    {
+      "name": "shell",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 19.96,
+      "failed_checks": []
+    },
+    {
+      "name": "wing-cap",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 20.58,
+      "failed_checks": []
+    },
+    {
+      "name": "swimming",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 38.95,
+      "failed_checks": []
+    },
+    {
+      "name": "air-meter",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 21.97,
+      "failed_checks": []
+    },
+    {
+      "name": "star-return-mario",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 69.09,
+      "failed_checks": []
+    },
+    {
+      "name": "star-return-sonic",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 68.84,
+      "failed_checks": []
+    },
+    {
+      "name": "star-return-climbers",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 69.73,
+      "failed_checks": []
+    },
+    {
+      "name": "respawn",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 25.41,
+      "failed_checks": []
+    },
+    {
+      "name": "manual-rounds",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 40.52,
+      "failed_checks": []
+    },
+    {
+      "name": "kirby-directions",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 28.68,
+      "failed_checks": []
+    },
+    {
+      "name": "cpu-swimming",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 20.05,
+      "failed_checks": [],
+      "fixture_setup_corrected": true,
+      "initial_failed_checks": [
+        "completed",
+        "two_native_ticks_per_host_frame",
+        "pause_resume",
+        "cpu_and_partner_damage_lower_air",
+        "nana_drowns_independently",
+        "cpu_drowning_ko",
+        "both_drown",
+        "selected_lives_icon"
+      ],
+      "initial_exit_code": 1,
+      "correction": {
+        "reason": "The older smoke fixture omits manual_act. Course none-mode therefore hides its temporary pair after scene observation. Explicit CPU mode lets the fixture advance the real Popo/Nana water, damage, air and drowning paths.",
+        "arguments_removed": [
+          "--difficulty",
+          "none"
+        ]
+      },
+      "initial_result_sha256": "39bb16eb8cbd1b1e75244139b5aa007b8c7df7bb41cc6a1fa15814ad4a937047",
+      "corrected_result_sha256": "3eb7d7c733f6855822bb180e29b385b980c1bf4391de8f7235df6cb03832b14a"
+    },
+    {
+      "name": "no-fast-fall",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 23.2,
+      "failed_checks": []
+    },
+    {
+      "name": "ground-pound",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 24.55,
+      "failed_checks": []
+    },
+    {
+      "name": "powerups",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 26.7,
+      "failed_checks": []
+    },
+    {
+      "name": "performance",
+      "group": "features",
+      "passed": true,
+      "exit_code": 0,
+      "seconds": 41.61,
+      "failed_checks": [],
+      "performance": [
+        {
+          "fps": 29.88,
+          "render_median_ms": 8.77,
+          "render_p95_ms": 11.98,
+          "frame_p95_ms": 34.56
+        },
+        {
+          "fps": 30.01,
+          "render_median_ms": 11.44,
+          "render_p95_ms": 13.32,
+          "frame_p95_ms": 34.37
+        },
+        {
+          "fps": 29.99,
+          "render_median_ms": 11.25,
+          "render_p95_ms": 12.47,
+          "frame_p95_ms": 34.38
+        }
+      ],
+      "performance_target_fps": 30,
+      "performance_minimum_fps": 28.5,
+      "performance_maximum_frame_p95_ms": 50
+    },
+    {
+      "name": "network-all",
+      "group": "network",
+      "passed": true,
+      "exit_code": 1,
+      "seconds": 265.07,
+      "failed_checks": [],
+      "initial_failed_checks": [
+        "campaign"
+      ],
+      "saved_log_parser_reanalysis": true,
+      "note": "Original process exit 1 is retained: the exact original campaign assertions pass when the structured prefix is located within an interleaved stdout/stderr line.",
+      "network_modes": {
+        "projectiles": true,
+        "combat": true,
+        "grab": true,
+        "campaign": true,
+        "partners": true,
+        "rounds": true
+      }
+    }
+  ],
+  "full_120_star_playthrough": false,
+  "real_windows_test": false,
+  "internet_test": false,
+  "network_clients_tested": 2,
+  "validation_revision": 2,
+  "production_binaries_unchanged": true,
+  "fixture_and_parser_corrections": [
+    {
+      "case": "controller",
+      "reason": "Sound assertions require native sound tracing, which the initial controller case omitted.",
+      "arguments_added": [
+        "--sound-diagnostic"
+      ],
+      "initial_failed_checks": [
+        "jump_sound_requested",
+        "native_sounds_resolved"
+      ],
+      "initial_result_sha256": "ad46a5b9901b3b5b0e19e79b7804d2e1968d00dad0fc8a5d41d542c8bf7c88b3",
+      "corrected_result_sha256": "aff8073062ea786020a4417106a96684dde53756d59a26abc2a6807d04ff01c4"
+    },
+    {
+      "case": "cannon",
+      "reason": "The isolated fresh save had a locked cannon. Unlocking test cannons permits the real firing path; ordinary stage tests still use earned progress.",
+      "arguments_added": [
+        "--all-stars"
+      ],
+      "initial_failed_checks": [
+        "host_cannon_aim",
+        "cannon_release_to_melee",
+        "native_cannon_flight"
+      ],
+      "initial_result_sha256": "661a41b0bfb69a8339bc9cbd2a15f5d165a379cc8cc46728cb2ee6d7dbf46af9",
+      "corrected_result_sha256": "61f8607c6459bf1053336425b3461e4c220ae6041975f72bdedfae9d5b859b4c"
+    },
+    {
+      "case": "enemy-throw",
+      "reason": "The recovery assertion reads native input diagnostics, which the initial enemy-throw case omitted.",
+      "arguments_added": [
+        "--input-diagnostic"
+      ],
+      "initial_failed_checks": [
+        "native_recovery_available"
+      ],
+      "initial_result_sha256": "734863f462db36567e96106441b881d78fe84065cf2e95a538bfd1b5f08858f9",
+      "corrected_result_sha256": "54b44f682658c55f38dd5b597c7d84b88419033558b0aaa9a061c64a8ac9dc6f"
+    },
+    {
+      "case": "cpu-swimming",
+      "reason": "The older smoke fixture omits manual_act. Course none-mode therefore hides its temporary pair after scene observation. Explicit CPU mode lets the fixture advance the real Popo/Nana water, damage, air and drowning paths.",
+      "arguments_removed": [
+        "--difficulty",
+        "none"
+      ],
+      "initial_failed_checks": [
+        "completed",
+        "two_native_ticks_per_host_frame",
+        "pause_resume",
+        "cpu_and_partner_damage_lower_air",
+        "nana_drowns_independently",
+        "cpu_drowning_ko",
+        "both_drown",
+        "selected_lives_icon"
+      ],
+      "initial_result_sha256": "39bb16eb8cbd1b1e75244139b5aa007b8c7df7bb41cc6a1fa15814ad4a937047",
+      "corrected_result_sha256": "3eb7d7c733f6855822bb180e29b385b980c1bf4391de8f7235df6cb03832b14a"
+    },
+    {
+      "case": "network-all",
+      "reason": "One campaign ownership record was present inside an interleaved stdout/stderr line. The corrected prefix parser re-evaluated the exact original campaign field assertions; no additional game run was needed.",
+      "initial_failed_checks": [
+        "campaign.one_authority"
+      ],
+      "parser_sha256": "e287fdb9cc4ce49c6e8223eac6c90e96d7494c49a63379be070110eb4849f114",
+      "original_network_report_sha256": "bc69a36b0fad4ab49fa7324dc691010460ff9f3aa55f77acb52b28b8d2742a61",
+      "corrected_network_report_sha256": "3f48a8b8190d7ef5495898399a200aa9aabc2e0d45e04882cf3c420c7f91e12a"
+    }
+  ],
+  "initial_suite_sha256": "5ea21883f3fb0a3d018a491388247dce480b5658b038ecece4fee483c5253f2d",
+  "followup_suite_sha256": "db4418bfdcc6af516d58249a712ace0435e4e89851d643c204c687c4d8baa948",
+  "scope": "Real engine stage-entry, roster and integration checks with isolated saves; six two-client loopback scenarios. The initial full run had four fixture setup failures and one structured-log parser failure. Four corrected cases were rerun, and the network campaign assertions were re-evaluated against the same saved logs. Gameplay binaries were identical throughout. No full 120-star completion, Windows hardware, Internet/NAT or sixteen-person claim.",
+  "public_evidence_note": "Selected test evidence; personal identifiers and local paths are sanitized. See the recorded test scope and platform limitations."
+}

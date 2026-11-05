@@ -4,7 +4,13 @@ from pathlib import Path
 import argparse,json,math,re,subprocess,sys,time
 HERE=Path(__file__).resolve().parent;ROOT=HERE.parents[2]
 def records(text,prefix):
-    return [dict(re.findall(r'(\w+)=([^\s]+)',line)) for line in text.splitlines() if line.startswith(prefix+' ')]
+    # C stdout diagnostics can be interrupted by an unbuffered stderr record.
+    # Locate the full structured prefix, then apply the same strict fields.
+    result=[]
+    for line in text.splitlines():
+        at=line.find(prefix+' ')
+        if at>=0:result.append(dict(re.findall(r'(\w+)=([^\s]+)',line[at:])))
+    return result
 def number(row,key):
     try:return float(row[key])
     except (KeyError,ValueError):return float('nan')

@@ -12,11 +12,11 @@ HERE=Path(__file__).resolve().parent
 ROOT=HERE.parents[2]
 
 FEATURES=[
-    ('controller','link','controller',720,['--input-diagnostic']),
+    ('controller','link','controller',720,['--input-diagnostic','--sound-diagnostic']),
     ('camera-follow','link','camera-follow',340,[]),
     ('camera-look','link','camera-look',240,[]),
-    ('cannon','link','cannon-range',320,[]),
-    ('enemy-throw','link','king-bobomb',360,[]),
+    ('cannon','link','cannon-range',320,['--all-stars']),
+    ('enemy-throw','link','king-bobomb',360,['--input-diagnostic']),
     ('grab','link','grab',180,[]),
     ('bowser-tail','link','bowser',210,[]),
     ('shield','link','shield',180,[]),
@@ -67,6 +67,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--groups',nargs='+',choices=('stages','roster','features','network'),default=['stages','roster','features','network'])
     parser.add_argument('--resume',type=Path,help='Reuse only successful cases from the exact same compiled build')
+    parser.add_argument('--cases',nargs='+',help='Run only these named cases within the selected groups')
     args=parser.parse_args()
     identity=build_identity()
     suite=ROOT/'work/beta-acceptance'/str(time.time_ns());suite.mkdir(parents=True)
@@ -85,13 +86,21 @@ def main():
             tasks.append(('fighter-'+name,'roster',[*common,'--character',name,'--roster-test','--difficulty','none','--cpus','0','--frames','180']))
     if 'features' in args.groups:
         for label,name,scenario,frames,extra in FEATURES:
-            tasks.append((label,'features',[*common,'--character',name,'--difficulty','impossible' if label=='performance' else 'none','--cpus','3' if label=='performance' else '0','--scenario',scenario,'--frames',str(frames),*extra]))
+            # The CPU-water fixture creates its own temporary pair and drives
+            # legacy explicit CPU count. Course none-mode would hide that pair
+            # when its older smoke-only manual_act value is cleared.
+            mode=[] if label=='cpu-swimming' else ['--difficulty','impossible' if label=='performance' else 'none']
+            tasks.append((label,'features',[*common,'--character',name,*mode,'--cpus','3' if label=='performance' else '0','--scenario',scenario,'--frames',str(frames),*extra]))
     if 'network' in args.groups:tasks.append(('network-all','network',[]))
+    if args.cases:
+        unknown=set(args.cases)-{task[0] for task in tasks}
+        if unknown:parser.error('Unknown cases for selected groups: '+', '.join(sorted(unknown)))
+        tasks=[task for task in tasks if task[0] in set(args.cases)]
     records=[]
     def save():
         result=dict(date=datetime.now(timezone.utc).isoformat(timespec='seconds'),
             passed=len(records)==len(tasks) and all(c['passed'] for c in records),
-            complete=len(records)==len(tasks),requested_groups=args.groups,
+            complete=len(records)==len(tasks),requested_groups=args.groups,requested_cases=args.cases,
             total_cases=len(tasks),completed_cases=len(records),build_identity=identity,cases=records,
             full_120_star_playthrough=False,real_windows_test=False,internet_test=False,
             network_clients_tested=2 if any(c['group']=='network' and c['passed'] for c in records) else 0)
