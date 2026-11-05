@@ -1,42 +1,67 @@
 # Super Melee 64
 
-<img src="outputs/sm64-melee-lab/branding/Super%20Melee%2064%20Rendered.png" alt="Super Melee 64" width="320">
+<img src="outputs/sm64-melee-lab/branding/Super%20Melee%2064%20Rendered.png" alt="Super Melee 64" width="400">
 
-Play Super Mario 64 as a Smash Bros. Melee fighter, with Melee movement,
-attacks, damage, character rendering and sounds inside the original adventure.
-Both engines run in one process. The roster includes the Akaneia characters.
+**Play Super Mario 64 as your favourite Smash Bros. Melee fighter.**
+Explore the adventure with Melee moves, character sounds and knockback, plus
+Akaneia characters and optional enemy fighters.
 
-This is a beta. macOS on Apple Silicon is the primary target; Windows x64 is
-experimental. Multiplayer targets 16 players, with bounded two-client tests.
-A full 120-star playthrough and a sixteen-person session are not certified.
+<!-- DOWNLOAD_BUTTONS_START -->
+<p align="center">
+  <a href="https://github.com/memelees/super-melee-64/releases/download/v0.6.0-beta.1/SuperMelee64-0.6.0-beta.1-mac-source-kit.zip"><img src="https://img.shields.io/badge/Download_for_Mac-2563EB?style=for-the-badge" alt="Download for Mac" height="44"></a>
+  <a href="https://github.com/memelees/super-melee-64/releases/download/v0.6.0-beta.1/SuperMelee64-0.6.0-beta.1-windows-experimental-source-kit.zip"><img src="https://img.shields.io/badge/Download_for_Windows-198754?style=for-the-badge" alt="Download for Windows" height="44"></a>
+</p>
+<p align="center">Beta installers · Mac: Apple Silicon, macOS 15+ · Windows x64: experimental beta · Linux: not available</p>
+<p align="center"><a href="https://github.com/memelees/super-melee-64/releases/download/v0.6.0-beta.1/SuperMelee64-0.6.0-beta.1-mac-source-kit.zip">Mac ZIP</a> · <a href="https://github.com/memelees/super-melee-64/releases/download/v0.6.0-beta.1/SuperMelee64-0.6.0-beta.1-windows-experimental-source-kit.zip">Windows ZIP</a> · <a href="https://github.com/memelees/super-melee-64/releases/tag/v0.6.0-beta.1">Release notes — 0.6.0-beta.1 (beta)</a></p>
+<!-- DOWNLOAD_BUTTONS_END -->
 
-## Install
+<a id="install"></a>
 
-Get the source installer from [Releases](https://github.com/memelees/super-melee-64/releases).
-The installer includes the setup helper and integration source. First setup
-downloads build dependencies and creates your local game from your own files.
+## Install and play
 
-1. Open **Install Super Melee 64** on Mac, or **Setup Windows.cmd** on Windows.
-2. Select or drop your original **US SM64 .z64 ROM** and **Melee USA Rev 2 disc image**.
-3. Follow the prerequisite checks, then build. Akaneia patches and public source
-   dependencies are obtained automatically. Your game images stay on your computer.
+You'll need your own **US Super Mario 64 ROM** and **Melee USA Rev 2 disc image**.
 
-The helper records a setup log, supports cancellation and retries, and checks
-available space. macOS requires Apple Silicon and macOS 15 or newer. Windows
-uses WSL/Ubuntu to build; the resulting native launcher does not require Python
-at gameplay startup. See [installation details](outputs/sm64-melee-lab/release/START%20HERE.txt)
-for the exact inputs and platform requirements.
+1. **Download for your computer** above, then extract the ZIP.
+2. **Open the installer:** `Install Super Melee 64.app` on Mac, or
+   `Setup Windows.cmd` on Windows.
+3. **Choose or drop in both game files**, follow the setup prompts and click
+   **Build / Resume**. Then open **Super Melee 64** to play.
 
-The Mac installer is an unsigned developer beta unless a release explicitly
-states otherwise. Follow [Apple's instructions for apps from identified and
-unidentified developers](https://support.apple.com/en-us/102445) if macOS blocks
-it. The installer does not disable system security settings.
+First setup prepares the game on your computer and guides any missing build
+tools. Allow **12 GiB free**; **20 GiB** is recommended. Your game files stay
+local. [Setup help and exact requirements](outputs/sm64-melee-lab/release/START%20HERE.txt)
+· [Release notes and checksums](https://github.com/memelees/super-melee-64/releases).
 
-After setup, open **Super Melee 64**. New Playthrough starts a zero-star save;
-Unlocked is a separate sandbox. Recommended stage starts keep their own earned
-stars and return to the course's star selector after a star.
+<details>
+<summary>Mac blocked the installer, or setup needs help?</summary>
 
-## Controls
+The Mac beta is ad-hoc signed and has not been notarized by Apple. If macOS
+blocks the downloaded helper, follow [Apple's instructions for opening a trusted
+downloaded app](https://support.apple.com/en-us/102445). The installer does not
+disable system security settings.
+
+On Windows, the helper guides installation of the Visual C++ runtime and
+WSL/Ubuntu build tools. Follow any restart and Ubuntu first-run prompts, then
+return to the helper. The finished native game does not need Python or WSL
+during gameplay. Windows gameplay remains experimental.
+
+Setup supports cancellation and resume, retains verified downloads and records
+a setup log. See [START HERE](outputs/sm64-melee-lab/release/START%20HERE.txt) for
+platform-specific steps and troubleshooting.
+
+</details>
+
+## Play your way
+
+**New Playthrough** starts from zero stars. **Continue** resumes your adventure.
+**Unlocked** opens the sandbox, and **Recommended** offers character/level
+pairings with their own earned-star saves. **No Melee Enemies** keeps the
+original Mario enemies and bosses.
+
+<details>
+<summary>Controls and character switching</summary>
+
+<a id="controls"></a>
 
 | Action | Keyboard | Standard controller |
 |---|---|---|
@@ -59,7 +84,10 @@ F8/L3 replaces the current Melee opponents with the next authored stage round.
 The sequence loops, one round per press. Manually summoned rounds wait for a
 new press; ordinary story encounters retain their normal wave progression.
 
-## Multiplayer beta
+</details>
+
+<details>
+<summary>Play with friends — experimental co-op</summary>
 
 Choose **Gameplay > Host Co-op** or **Join Co-op** and use the host's IP address.
 Every player needs the same Super Melee 64 beta build. Stock Coop Deluxe and
@@ -73,7 +101,31 @@ the simplest first test. Two-client loopback tests do not establish WAN/NAT
 behaviour, public-peer security, or sixteen-player performance. See
 [security scope](SECURITY.md) and [reported test coverage](outputs/sm64-melee-lab/verification/beta-acceptance.json).
 
-## Build and contribute
+</details>
+
+<details>
+<summary>Beta status and tested coverage</summary>
+
+The current beta passed 27 stage-start cases, 33 fighter-form cases and the
+integration/network acceptance cases. Co-op has been exercised with two local
+clients. A full 120-star playthrough, sixteen-person session and real Windows
+gameplay remain unverified. See the [test report](outputs/sm64-melee-lab/verification/beta-acceptance.json)
+for the exact scope and fixture corrections.
+
+</details>
+
+## Make it your own
+
+Fork, modify and extend the original integration under [GPL-3.0-or-later](LICENSING.md).
+Distributed covered versions must preserve the GPL's source and licence freedoms;
+private edits can stay private. Game assets and third-party code retain their
+own terms.
+
+[How it works](docs/INTEGRATION.md) · [Adapt it to another game](docs/PORTING.md)
+· [Contribute](CONTRIBUTING.md)
+
+<details>
+<summary>Build from source and package a release</summary>
 
 Forks, modifications and experiments are welcome. The original integration is
 **GPL-3.0-or-later**: you can change and reuse it without asking us, including
@@ -107,7 +159,10 @@ Code lives in `outputs/sm64-melee-lab/native`; installer source is under
 branding assets. Never upload the generated game app, build folder or recordings:
 they contain local game data.
 
-## Licensing and credits
+</details>
+
+<details>
+<summary>Licensing and credits</summary>
 
 Read [LICENSE](LICENSE), [LICENSING](LICENSING.md) and
 [third-party notices](outputs/sm64-melee-lab/release/THIRD-PARTY.txt). The licence
@@ -119,3 +174,5 @@ This unofficial fan project is not affiliated with Nintendo, HAL Laboratory,
 SEGA or the owners of the characters. SM64ex, Coop Deluxe, melee-pc, Akaneia,
 the Melee decompilation projects and the 3D Melee reference mod provide the
 underlying work; their notices and source pins are preserved.
+
+</details>
