@@ -79,6 +79,10 @@ static void smb_scenario(struct MarioState* m,SmbInput* cmd) {
     if(last_level!=gCurrLevelNum){last_level=gCurrLevelNum;fprintf(stderr,"SMB SCENARIO LEVEL name=%s level=%d frames=%u\n",test,gCurrLevelNum,frames);}
     if(!strcmp(test,"controls")||!strcmp(test,"controller"))return;
     cmd->stick_x=cmd->stick_y=0;cmd->buttons=0;
+    if(!strcmp(test,"kirby-copy")) {
+        if(frames>=35&&frames<70)cmd->buttons=0x200;
+        return;
+    }
     if(!strcmp(test,"stage-stars")) {
         static unsigned round,phase,entered,generation;
         /* Isolate progression and post-menu controls from CPU attacks. Holding

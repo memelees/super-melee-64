@@ -1,4 +1,4 @@
-SUPER MELEE 64 — 0.6.0-beta.1 / NATIVE14
+SUPER MELEE 64 — 0.6.0-beta.2 / NATIVE14
 
 This source-only beta builds the game locally from your own game files. It
 includes the installer, original integration source and project artwork. No
@@ -39,8 +39,25 @@ gcc-16, CMake, Ninja, SDL2/SDL3, GLEW, pkg-config, xdelta3, 7-Zip, Git, patch,
 and curl. Prepare Build Tools checks these and guides missing steps.
 CLI (extract to a directory without spaces):
   python3 Setup.py --platform mac --rom /path/game.z64 --melee /path/game.iso
-Add --check for an input/prerequisite check without downloads or compilation.
+Add --check for an input/prerequisite check without downloads or a game build.
 Use --check-tools for prerequisites alone. Setup Mac.command also supports CLI.
+
+MAC BUILD-TOOLS REPAIR
+Setup selects Apple's active macOS SDK explicitly, including when resuming an
+older failed build, and checks both the Melee GCC compiler and Apple C++ headers
+before downloading game dependencies. A stale SDKROOT from a shell is replaced
+with the SDK reported by xcrun. The source-only header checks run no game code.
+If the check fails, the app shows repair instructions and writes the compiler
+details to setup.log. The installer never accepts Apple's licence for you.
+
+- Xcode licence/setup: open Xcode, review the licence and finish its prompts.
+- Outdated tools or missing headers: install the Apple Command Line Tools update
+  from System Settings > General > Software Update; open Xcode if you use it.
+- Missing GCC: choose Prepare Build Tools to install Homebrew's GCC compiler.
+Then choose Prepare Build Tools and Build / Resume in the SAME build folder.
+Existing game inputs, downloaded patches and build outputs are preserved.
+When updating the installer, extract the new kit and open its new installer app;
+select the original build folder so its updated setup source can resume there.
 
 WINDOWS — EXPERIMENTAL x64 WINDOWS 10/11 BETA
 1. Extract the complete Windows kit to C:\SuperMelee64 (no spaces/OneDrive).
@@ -73,7 +90,8 @@ F8 / L3: summon one authored stage round, cycling through its saved rounds.
        A deliberate press replaces current Melee opponents. Manual rounds
        wait for another press; ordinary story waves advance after clearing.
 F10: toggle wall jumps for every fighter. Default OFF; native abilities remain.
-F11: toggle enemy ground lines/rings. Default OFF; circle shadows remain.
+Fighters use circular ground shadows. Height lines/rings and their toggle have
+been removed; old saved line settings are ignored.
 The Mac Gameplay menu also exposes these actions. Toggles persist per profile.
 
 WATER / CAPS / TRAVEL

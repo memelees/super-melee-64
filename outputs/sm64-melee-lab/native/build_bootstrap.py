@@ -14,6 +14,9 @@ SOURCE_SUFFIXES={'.c','.cpp','.h','.inc','.json','.patch','.manifest','.md'}
 # Apply only these recorded installer-owned configuration changes; the ZIP
 # itself remains the exact pinned source, and other local edits are preserved.
 LOCAL_OVERRIDES={
+    'tools/melee3d/native_mac.py':[(
+        '"-DCMAKE_OSX_DEPLOYMENT_TARGET=15.0", "-DAURORA_DAWN_PROVIDER=package",',
+        '"-DCMAKE_OSX_DEPLOYMENT_TARGET=15.0", "-DCMAKE_OSX_SYSROOT=" + os.environ.get("SDKROOT", "macosx"), "-DAURORA_DAWN_PROVIDER=package",')],
     'tools/melee3d/native_compatibility.py':[(
         'DISC = Path.home() / "Downloads/Super Smash Bros. Melee (USA) (En,Ja) (Rev 2).iso"',
         'DISC = Path(os.environ["SM64_MELEE_DISC"])')],

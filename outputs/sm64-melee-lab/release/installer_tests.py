@@ -6,6 +6,7 @@ from unittest import mock
 import setup_support as support
 import Setup as setup
 import prepare_installer_inputs as inputs
+import mac_toolchain as mac
 
 class InstallerTests(unittest.TestCase):
     def setUp(self):
@@ -124,10 +125,77 @@ class InstallerTests(unittest.TestCase):
         for name in ('Play Super Melee 64.cmd','Play Super Melee 64.vbs'):
             text=(helper/name).read_text().lower();self.assertNotIn('python',text);self.assertIn('super melee 64.exe',text)
     def test_check_tools_reads_no_games_and_writes_no_setup(self):
-        with mock.patch.object(setup,'ROOT',self.root),mock.patch.object(sys,'argv',['Setup.py','--check-tools']),contextlib.redirect_stdout(io.StringIO()) as output:
+        with mock.patch.object(setup,'ROOT',self.root),mock.patch.object(sys,'argv',['Setup.py','--check-tools']),mock.patch.object(setup,'mac_toolchain_report',return_value={'ok':True}),contextlib.redirect_stdout(io.StringIO()) as output:
             self.assertEqual(setup.main(),0)
         report=json.loads(output.getvalue());self.assertIn('missing',report);self.assertIn('filesystem',report)
         self.assertFalse((self.root/'work').exists());self.assertFalse((self.root/'setup.log').exists())
+    def test_mac_sdk_and_compilers_are_explicit_with_spaces_and_stale_environment(self):
+        sdk=self.root/'Apple SDK/MacOSX.sdk';header=sdk/'usr/include/sys/types.h'
+        header.parent.mkdir(parents=True);header.write_text('/* fixture header */')
+        original={'PATH':'/fixture/tools','SDKROOT':'/removed/old-sdk','KEEP':'unchanged'}
+        calls=[]
+        def probe(command,environment,source=None):
+            calls.append((command,dict(environment),source))
+            if command[0].endswith('xcode-select'):return '/fixture/Developer'
+            if command[0].endswith('xcrun'):return str(sdk)
+            return ''
+        with mock.patch.object(mac,'_probe',side_effect=probe),mock.patch.object(mac,'mac_gcc',return_value='/fixture/gcc-16'):
+            environment,report=mac.mac_build_environment(original)
+        self.assertEqual(original['SDKROOT'],'/removed/old-sdk');self.assertEqual(environment['KEEP'],'unchanged')
+        self.assertEqual(environment['SDKROOT'],str(sdk));self.assertEqual(environment['GCC_BIN'],'/fixture/gcc-16')
+        self.assertNotIn('SDKROOT',calls[0][1]);self.assertNotIn('SDKROOT',calls[1][1])
+        self.assertEqual(len(calls),4)
+        for command,env,source in calls[2:]:
+            self.assertEqual(command[command.index('-isysroot')+1],str(sdk))
+            self.assertIn('-fsyntax-only',command);self.assertEqual(command[-1],'-');self.assertIn('sys/types.h',source)
+            self.assertEqual(env['GCC_BIN'],'/fixture/gcc-16')
+        self.assertTrue(report['c_headers_checked'] and report['cxx_headers_checked'])
+    def test_mac_missing_sdk_stops_before_any_compiler(self):
+        with mock.patch.object(mac,'_probe',side_effect=['/fixture/Developer','/missing/sdk']) as probe:
+            with self.assertRaises(mac.MacToolchainError) as failure:mac.mac_build_environment({})
+        self.assertEqual(probe.call_count,2);self.assertEqual(failure.exception.diagnostic['code'],'mac-sdk')
+        self.assertIn('Build / Resume',str(failure.exception))
+    def test_mac_gcc_selection_matches_upstream_and_honours_override(self):
+        def which(name,path):return '/fixture/'+name if name in ('gcc-16','gcc-15','my-gcc') else None
+        with mock.patch.object(mac.shutil,'which',side_effect=which):
+            self.assertEqual(mac.mac_gcc({'PATH':'/fixture'}),str(Path('/fixture/gcc-16').absolute()))
+            self.assertEqual(mac.mac_gcc({'PATH':'/fixture','GCC_BIN':'my-gcc'}),str(Path('/fixture/my-gcc').absolute()))
+            self.assertIsNone(mac.mac_gcc({'PATH':'/fixture','GCC_BIN':'missing'}))
+    def test_mac_failed_header_check_and_license_are_actionable(self):
+        for output,code in [('fatal error: sys/types.h: No such file or directory','mac-compiler'),
+                            ('You have not agreed to the Xcode license','xcode-license')]:
+            failure=mac.compiler_problem(output,'gcc-16')
+            self.assertEqual(failure.diagnostic['code'],code)
+            self.assertIn('Build / Resume',failure.diagnostic['recovery'])
+            self.assertIn(output,str(failure))
+    def test_mac_timeout_becomes_readable_error(self):
+        with mock.patch.object(mac.subprocess,'run',side_effect=subprocess.TimeoutExpired(['compiler'],30)):
+            with self.assertRaises(mac.MacToolchainError):mac._probe(['compiler'],{})
+    def test_mac_preflight_failure_has_no_downloads_and_saves_gui_diagnostic(self):
+        # Exercise the real main ordering without game images or external tools.
+        failure=mac.compiler_problem('fatal error: sys/types.h: No such file or directory','gcc-16')
+        with mock.patch.object(setup,'ROOT',self.root),mock.patch.object(sys,'argv',['Setup.py','--rom','fixture.z64','--melee','fixture.iso']), \
+             mock.patch.object(setup,'verify_inputs',return_value={}),mock.patch.object(setup,'preflight',return_value=[]), \
+             mock.patch.object(setup,'verify_bootstrap',return_value={'revision':'fixture','files':{}}),mock.patch.object(setup,'digest',return_value='fixture'), \
+             mock.patch.object(setup,'require_filesystem'),mock.patch.object(setup.sys,'platform','darwin'), \
+             mock.patch.object(setup.platform,'machine',return_value='arm64'),mock.patch.object(setup.platform,'mac_ver',return_value=('15.0','','')), \
+             mock.patch.object(setup,'mac_build_environment',side_effect=failure),mock.patch.object(setup,'install') as install:
+            with self.assertRaises(mac.MacToolchainError):setup.main()
+        install.assert_not_called();self.assertEqual(self.state()['status'],'failed')
+        self.assertEqual(json.loads((self.root/'work/setup-error.json').read_text())['code'],'mac-compiler')
+        self.assertIn('sys/types.h',(self.root/'setup.log').read_text())
+        self.assertFalse((self.root/'work/setup.lock').exists())
+    def test_mac_sdk_override_migrates_verified_adapter_and_preserves_other_edits(self):
+        adapter=self.root/'adapter';setup.extract_bootstrap(setup.BOOTSTRAP,adapter)
+        native=adapter/'tools/melee3d/native_mac.py';original=native.read_text()
+        setup.configure_local_sources(adapter)
+        self.assertIn('"-DCMAKE_OSX_SYSROOT=" + os.environ.get("SDKROOT", "macosx")',native.read_text())
+        self.assertNotEqual(native.read_text(),original)
+        setup.extract_bootstrap(setup.BOOTSTRAP,adapter) # Resume verifies the reversible override.
+        setup.configure_local_sources(adapter)
+        self.assertEqual(native.read_text().count('"-DCMAKE_OSX_SYSROOT="'),1)
+        native.write_text(native.read_text()+'\n# custom change\n')
+        with self.assertRaisesRegex(RuntimeError,'Preserving changed'):setup.extract_bootstrap(setup.BOOTSTRAP,adapter)
     def test_patch_resume_and_verified_cache(self):
         target=self.root/'official-patch';partial=target.with_name(target.name+'.partial');partial.write_bytes(b'ab')
         payload=b'abcdef';digest=hashlib.sha256(payload).hexdigest();calls=[]

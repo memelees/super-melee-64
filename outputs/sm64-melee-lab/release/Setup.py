@@ -2,7 +2,8 @@
 """Build Super Melee 64 locally from a player's own verified game files."""
 from pathlib import Path
 import argparse,hashlib,importlib.util,json,os,platform,plistlib,shlex,shutil,subprocess,sys,time
-from setup_support import Session,SetupCancelled,filesystem_report,require_filesystem,checkout_pinned
+from setup_support import Session,SetupCancelled,filesystem_report,require_filesystem,checkout_pinned,atomic_json
+from mac_toolchain import MacToolchainError,mac_gcc,mac_build_environment,mac_toolchain_report
 SESSION=None
 
 def root_path():
@@ -53,9 +54,10 @@ def checkout(name,path):
 
 def preflight(target):
     required=['git','cmake','ninja','patch','xdelta3','curl']
-    if target=='mac':required+=['clang','clang++','gcc-16','pkg-config','sdl2-config']
+    if target=='mac':required+=['clang','clang++','pkg-config','sdl2-config']
     else:required+=['x86_64-w64-mingw32-gcc','x86_64-w64-mingw32-g++','x86_64-w64-mingw32-ar','sh','make']
     missing=[x for x in required if not shutil.which(x)]
+    if target=='mac' and not mac_gcc():missing.append('Homebrew GCC (Prepare Build Tools)')
     if not (shutil.which('7zz') or shutil.which('7z')):missing.append('7z/7zz')
     if not (shutil.which('gmake') or shutil.which('make')):missing.append('make')
     if not importlib.util.find_spec('PIL'):missing.append('Python Pillow')
@@ -140,23 +142,38 @@ def main():
     args=parser.parse_args()
     if not 1<=args.minimum_free_gib<=1024:parser.error('minimum-free-gib must be between 1 and 1024')
     if args.check_tools:
-        print(json.dumps(dict(platform=args.platform,missing=preflight(args.platform),filesystem=filesystem_report(ROOT,args.minimum_free_gib)),indent=2));return 0
+        report=dict(platform=args.platform,missing=preflight(args.platform),filesystem=filesystem_report(ROOT,args.minimum_free_gib))
+        if args.platform=='mac' and sys.platform=='darwin':report['mac_toolchain']=mac_toolchain_report()
+        print(json.dumps(report,indent=2));return 0 if report.get('mac_toolchain',{}).get('ok',True) else 2
     rom=args.rom.expanduser().resolve() if args.rom else choose('Select your original US Super Mario 64 ROM',[('SM64 ROM','*.z64'),('All files','*')])
     disc=args.melee.expanduser().resolve() if args.melee else choose('Select your original Melee USA Rev 2 disc',[('GameCube disc','*.iso *.gcm'),('All files','*')])
     identities=verify_inputs(rom,disc);missing=preflight(args.platform)
     bootstrap=verify_bootstrap(BOOTSTRAP)
     report=dict(platform=args.platform,input_checks=identities,missing=missing,downloaded=False,played=False,
         source_bootstrap=dict(revision=bootstrap['revision'],files=len(bootstrap['files']),sha256=digest(BOOTSTRAP,'sha256')))
-    if args.check:print(json.dumps(report,indent=2));return 0 if not missing else 2
+    if args.check:
+        if args.platform=='mac' and sys.platform=='darwin':report['mac_toolchain']=mac_toolchain_report()
+        print(json.dumps(report,indent=2));return 0 if not missing and report.get('mac_toolchain',{}).get('ok',True) else 2
     if missing:raise RuntimeError('Install the prerequisites in START HERE.txt: '+', '.join(missing))
     require_filesystem(ROOT,args.minimum_free_gib)
     if args.platform=='mac' and (sys.platform!='darwin' or platform.machine()!='arm64' or int(platform.mac_ver()[0].split('.')[0] or 0)<15):raise RuntimeError('The Mac target currently requires Apple Silicon and macOS 15+.')
     with Session(ROOT,dict(inputs=identities,pins=PINS,bootstrap=report['source_bootstrap']),args.cancel_file) as session:
         SESSION=session
-        try:return install(args,rom,disc,identities)
+        try:
+            (ROOT/'work/setup-error.json').unlink(missing_ok=True)
+            build_env=None
+            if args.platform=='mac':
+                print('Checking Apple SDK and Melee/Apple compiler headers before downloads...',flush=True)
+                build_env,toolchain=mac_build_environment()
+                print('Mac compiler checks passed. SDK: '+toolchain['sdk']+'; GCC: '+toolchain['gcc'],flush=True)
+                session.check_cancel()
+            return install(args,rom,disc,identities,build_env)
+        except MacToolchainError as error:
+            atomic_json(ROOT/'work/setup-error.json',error.diagnostic)
+            raise
         finally:SESSION=None
 
-def install(args,rom,disc,identities):
+def install(args,rom,disc,identities,build_env=None):
     work=ROOT/'work';work.mkdir(exist_ok=True)
     def stage(number,label):SESSION.stage(number,12,label)
     stage(1,'Prepare pinned source dependencies')
@@ -170,7 +187,7 @@ def install(args,rom,disc,identities):
     target=host/'baserom.us.z64'
     if target.exists() and digest(target,'sha1')!=ROM_SHA1:raise RuntimeError('Preserving a different existing host ROM: '+str(target))
     if not target.exists():copy_owned_input(rom,target,'sha1',ROM_SHA1)
-    env=dict(os.environ,SMB_UPSTREAM_ROOT=str(upstream),SMB_BUILD_TARGET=args.platform,
+    env=dict(os.environ if build_env is None else build_env,SMB_UPSTREAM_ROOT=str(upstream),SMB_BUILD_TARGET=args.platform,
         SMB_RUNTIME_DIR=str(work/'melee-embedded'),SM64_MELEE_DISC=str(disc),
         SMB_UPSTREAM_REVISION=PINS['smash-royale'][1])
     # Framework Python may have no bundled CA certificates. Keep HTTPS

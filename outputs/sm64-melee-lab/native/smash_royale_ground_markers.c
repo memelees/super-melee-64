@@ -278,13 +278,7 @@ static void render_shadows(void)
     }
 }
 
-/* Reference-style player colour, floor ring and vertical height tether. */
-static GXColor marker_colour(int slot)
-{
-    GXColor c=m3d_MenuColour(slot);c.a=210;return c;
-}
-/* A stable position cue complements the animated light-direction silhouette.
- * Each wedge is fitted to actual ground and clipped at holes/level changes. */
+/* Circular SM64-style CPU/remote-player shadows, fitted to live floors. */
 static void ground_markers(void)
 {
     HSD_GObj* gobj;
@@ -319,23 +313,6 @@ static void ground_markers(void)
             p.x+=cosf(a)*radius; p.z+=sinf(a)*radius; p.y+=5;
             supported[i]=m3d_GroundBelow(&p,&rim[i]) && fabsf(rim[i].y-center.y)<=radius;
         }
-        GXColor color=marker_colour(fp->player_idx);
-        GXSetLineWidth(12,GX_TO_ZERO);
-        if(height>2 && (!fp->player_idx || (getenv("SMB_ENEMY_GROUND_LINES")&&atoi(getenv("SMB_ENEMY_GROUND_LINES"))))) {
-            GXBegin(GX_LINES,GX_VTXFMT0,2);
-            GXPosition3f32(center.x,center.y+.08f,center.z);GXColor4u8(color.r,color.g,color.b,160);
-            GXPosition3f32(fp->cur_pos.x,fp->cur_pos.y+1,fp->cur_pos.z);GXColor4u8(color.r,color.g,color.b,220);
-            GXEnd();
-        }
-        for(i=0;i<24;i++) {
-            if(fp->player_idx && !(getenv("SMB_ENEMY_GROUND_LINES")&&atoi(getenv("SMB_ENEMY_GROUND_LINES"))))continue;
-            if(!supported[i] || !supported[(i+1)%24])continue;
-            Vec3 a=rim[i],b=rim[(i+1)%24];
-            GXBegin(GX_LINES,GX_VTXFMT0,2);
-            GXPosition3f32(a.x,a.y+.08f,a.z);GXColor4u8(color.r,color.g,color.b,210);
-            GXPosition3f32(b.x,b.y+.08f,b.z);GXColor4u8(color.r,color.g,color.b,210);
-            GXEnd();
-        }
         for (i=0;i<24;i++) {
             if(!fp->player_idx)continue;
             Vec3 u,v;
@@ -347,48 +324,6 @@ static void ground_markers(void)
             GXPosition3f32(u.x,u.y+0.04f,u.z); GXColor4u8(0,0,0,0);
             GXPosition3f32(v.x,v.y+0.04f,v.z); GXColor4u8(0,0,0,0);
             GXEnd();
-        }
-    }
-    /* The same facing cone selects the projectile assist. Show its current
-     * candidate before firing, so nearby opponents do not steal the aim. */
-    gobj=Player_GetEntityAtIndex(0,0);
-    if (gobj && gobj->user_data) {
-        Fighter* fp=gobj->user_data;
-        float lx,lz;
-        Vec3 from=fp->cur_pos;
-        HSD_GObj* target;
-        from.y+=8;
-        m3d_GetLane(fp,&lx,&lz);
-        target=m3d_AimTarget(fp,&from,lx*fp->facing_dir,lz*fp->facing_dir);
-        if (target) {
-            Fighter* other=target->user_data;
-            Vec3 center=other->cur_pos,ground;
-            center.y+=2;
-            if (m3d_GroundBelow(&center,&ground)) {
-                for (i=0;i<32;i++) {
-                    int j;
-                    float angle[4],radius[4]={4,4,4.6f,4.6f};
-                    Vec3 points[4];
-                    bool valid=true;
-                    angle[0]=angle[3]=i*6.2831853f/32;
-                    angle[1]=angle[2]=(i+1)*6.2831853f/32;
-                    for (j=0;j<4;j++) {
-                        Vec3 q=center;
-                        q.x+=cosf(angle[j])*radius[j];
-                        q.z+=sinf(angle[j])*radius[j];
-                        q.y+=5;
-                        if (!m3d_GroundBelow(&q,&points[j]) ||
-                            fabsf(points[j].y-ground.y)>3) valid=false;
-                    }
-                    if (!valid) continue;
-                    GXBegin(GX_QUADS,GX_VTXFMT0,4);
-                    for (j=0;j<4;j++) {
-                        GXPosition3f32(points[j].x,points[j].y+0.06f,points[j].z);
-                        GXColor4u8(255,195,40,190);
-                    }
-                    GXEnd();
-                }
-            }
         }
     }
 }
@@ -536,6 +471,6 @@ void smb_native_ground_markers(void) {
     HSD_GObj* g=Player_GetEntity(0);static unsigned frame;
     if(g && ++frame%30==0) {
         Fighter* f=g->user_data;Vec3 q=f->cur_pos,ground;q.y+=1;
-        if(m3d_GroundBelow(&q,&ground))fprintf(stderr,"SMB GROUND MARKER frame=%u alpha=%d height=%.3f floor=%.3f line=%d live_sm64=1\n",frame,m3d_GroundMarkerAlpha(0),f->cur_pos.y-ground.y,ground.y,f->cur_pos.y-ground.y>2&&m3d_GroundMarkerAlpha(0)>0);
+        if(m3d_GroundBelow(&q,&ground))fprintf(stderr,"SMB GROUND MARKER frame=%u alpha=%d height=%.3f floor=%.3f line=0 live_sm64=1\n",frame,m3d_GroundMarkerAlpha(0),f->cur_pos.y-ground.y,ground.y);
     }
 }

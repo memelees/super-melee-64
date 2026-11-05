@@ -133,7 +133,6 @@ void smb_host_key(int code,int down) {
     if(code==SDL_SCANCODE_F8&&down&&!host_keys[code]&&smb_round_controls_ready())round_input_pending=1;
     if(code==SDL_SCANCODE_F7&&down&&!host_keys[code])character_menu_requested=2;
     if(code==SDL_SCANCODE_F10&&down&&!host_keys[code])smb_host_option(0,1);
-    if(code==SDL_SCANCODE_F11&&down&&!host_keys[code])smb_host_option(1,1);
     if(code==SDL_SCANCODE_F6&&down&&!host_keys[code])smb_host_change_menu_request();
     if(code==SDL_SCANCODE_F9&&down&&!host_keys[code]) {
         smb_record_toggle();

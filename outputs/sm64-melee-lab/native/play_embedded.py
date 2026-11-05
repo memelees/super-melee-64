@@ -106,7 +106,9 @@ def run(args):
             MELEE_BACKEND='d3d12' if WINDOWS else 'metal',MELEE_VSYNC='0',MELEE_SEED='1',MELEE_CACHE_DIR=str(ROOT/'work/melee-embedded/gpu-cache'),
             MELEE_WINDOW_TITLE='Loading embedded fighter',MELEE_LOG_FILE=str(case/'native-game.log'))
         if args.wall_jumps:env['SMB_UNIVERSAL_WALL_JUMP']='1'
-        if args.enemy_ground_lines:env['SMB_ENEMY_GROUND_LINES']='1'
+        if args.scenario=='kirby-copy':
+            env['SMB_COPY_TEST_KIND']=str(args.copy_kind)
+            env['SMB_PLAYER_COSTUME']=str(args.copy_costume)
         if not args.smoke:
             options=Path(os.environ.get('APPDATA',str(Path.home())))/'Super Melee 64' if WINDOWS else Path.home()/'Library/Application Support/Super Melee 64'
             options.mkdir(parents=True,exist_ok=True);env['SMB_OPTIONS_PATH']=str(options/'Gameplay.options')
@@ -210,6 +212,9 @@ def run(args):
         live_collision='SMB WORLD REBUILD' in text,
         airborne=any(r['grounded']==0 for r in rows),active_attack=any(r['hitboxes']>0 for r in rows),
         world_movement=bool(rows) and max((r['x']-rows[0]['x'])**2+(r['z']-rows[0]['z'])**2 for r in rows)>300**2)
+    if args.scenario=='kirby-copy':
+        for key in ('airborne','active_attack','world_movement'):checks.pop(key,None)
+        checks['copy_ability_and_hat']='SMB KIRBY COPY PASS ' in text and 'special=1 native_render=1' in text
     if args.scenario=='stage':
         for key in ('airborne','active_attack','world_movement'):checks.pop(key)
         starts=re.findall(r'SMB STAGE READY stage=(\d+) level=(\d+) kind=(\d+) frame=(\d+)',text)
@@ -325,7 +330,9 @@ def run(args):
         checks['catchup_preserves_damage']=bool(catchups) and all(abs(r['percent_before']-r['percent_after'])<.01 for r in catchups)
     if args.camera=='sm64' and args.scenario!='basic':
         checks['sm64_camera_default']='SMB CAMERA provider=melee' not in text and 'SMB CAMERA provider=sm64 follow_scale=1.25' in text
-        checks['increased_stock_follow_distance']=bool(re.search(r'SMB CAMERA DISTANCE base=(?:800.0 preferred=1000.0|1000.0 preferred=1250.0)',text))
+        # The stock 1.25x follow distance can gain up to .45x combat framing.
+        distances=[(float(base),float(preferred)) for base,preferred in re.findall(r'SMB CAMERA DISTANCE base=([\d.]+) preferred=([\d.]+)',text) if float(base) in (800,1000)]
+        checks['increased_stock_follow_distance']=bool(distances) and all(base*1.25-.1<=preferred<=base*1.70+.1 for base,preferred in distances)
     if args.scenario=='lighting':
         for key in ('airborne','active_attack','world_movement'):checks.pop(key,None)
         checks['lighting_registered']=('SMB LIGHTS diffuse_mask=0' in text) if args.legacy_lighting else bool(re.search(r'SMB LIGHTS diffuse_mask=[1-9a-f]',text))
@@ -578,7 +585,7 @@ def run(args):
         checks['zero_enemy_seats']=args.cpus==0 and not enemy_names
     if args.scenario=='ground-hud':
         for key in ('airborne','active_attack','world_movement'):checks.pop(key,None)
-        checks['live_ground_line']=bool(re.search(r'SMB GROUND MARKER .*alpha=[1-9]\d* .*line=1 live_sm64=1',text))
+        checks['live_circle_shadow']=bool(re.search(r'SMB GROUND MARKER .*alpha=[1-9]\d* .*line=0 live_sm64=1',text))
         checks['hud_over_foreground']='SMB HUD OCCLUSION' in text and bool(re.search(r'SMB HUD OCCLUSION .*pass=1',text))
     if args.scenario=='star-return':
         for key in ('airborne','active_attack','world_movement'):checks.pop(key,None)
@@ -670,8 +677,9 @@ if __name__=='__main__':
     p.add_argument('--course-enemies',action='store_true',help='Course-specific one-stock encounters (default in normal play)')
     p.add_argument('--enemies',help='One to three comma-separated fighter names, e.g. sonic,link,bowser; also sets CPU count')
     p.add_argument('--wall-jumps',action='store_true',help='Enable wall jumps for every fighter')
-    p.add_argument('--enemy-ground-lines',action='store_true',help='Show enemy height lines (default off)')
-    p.add_argument('--scenario',choices=['thematic-rounds','air-meter','camera-follow','swim-controls','npc-lava','npc-environment','coop-capacity','npc-tall','swim-drown','swim','swim-cpus','shell-ride','wing-flight','directions','stage-stars','wing-entrance','stage','entrance-snow','entrance-lava','camera-look','no-fast-fall','ground-pound','powerups','walls-all','character-switch','basic','star-return','campaign-waves','encounter-launch','course-battle','ground-hud','model-forms','npcs','npc-follow','npc-catchup','grab','bowser','shield','heave-ho','king-bobomb','cannon-range','cannon','victory-forms','controls','controller','doors','stairs','progression','impact','projectiles','ledges','bomb-impact','walls','health','platforms','star','reload-save','slope','effects','lighting','respawn','transform','flight-low','flight-high','barriers'],default='basic')
+    p.add_argument('--copy-kind',type=int,default=9,help=argparse.SUPPRESS)
+    p.add_argument('--copy-costume',type=int,choices=range(6),default=0,help=argparse.SUPPRESS)
+    p.add_argument('--scenario',choices=['kirby-copy','thematic-rounds','air-meter','camera-follow','swim-controls','npc-lava','npc-environment','coop-capacity','npc-tall','swim-drown','swim','swim-cpus','shell-ride','wing-flight','directions','stage-stars','wing-entrance','stage','entrance-snow','entrance-lava','camera-look','no-fast-fall','ground-pound','powerups','walls-all','character-switch','basic','star-return','campaign-waves','encounter-launch','course-battle','ground-hud','model-forms','npcs','npc-follow','npc-catchup','grab','bowser','shield','heave-ho','king-bobomb','cannon-range','cannon','victory-forms','controls','controller','doors','stairs','progression','impact','projectiles','ledges','bomb-impact','walls','health','platforms','star','reload-save','slope','effects','lighting','respawn','transform','flight-low','flight-high','barriers'],default='basic')
     p.add_argument('--render-diagnostic',action='store_true');p.add_argument('--smoke',action='store_true');p.add_argument('--frames',type=int,default=180)
     p.add_argument('--model-diagnostic',action='store_true',help='Check native model-part visibility against authored DAT selections')
     p.add_argument('--legacy-model-visibility',action='store_true',help=argparse.SUPPRESS)

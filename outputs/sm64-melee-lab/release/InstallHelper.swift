@@ -1,5 +1,33 @@
 import AppKit
 
+struct SetupDiagnostic: Codable {
+    let code: String, title: String, message: String, recovery: String
+    var detail: String?
+}
+func toolDiagnostic(_ output: String) -> SetupDiagnostic? {
+    let lower = output.lowercased()
+    if lower.contains("license") && ["agree", "accept", "review"].contains(where: lower.contains) {
+        return SetupDiagnostic(code:"xcode-license",title:"Finish Xcode setup",
+            message:"Apple is blocking the build tools until the Xcode licence has been reviewed.",
+            recovery:"Open Xcode, review its licence and complete the setup prompts yourself. Then choose Prepare Build Tools and Build / Resume. Existing downloads are kept.")
+    }
+    if lower.contains("command line tools are too outdated") || lower.contains("outdated command line tools") {
+        return SetupDiagnostic(code:"mac-tools-outdated",title:"Update Apple Command Line Tools",
+            message:"Homebrew cannot prepare the build because Apple's Command Line Tools are out of date.",
+            recovery:"Open System Settings > General > Software Update and install the Command Line Tools update. If you use Xcode, open it and finish setup. Then retry Prepare Build Tools and Build / Resume in the same folder. Your game files and verified downloads are kept.")
+    }
+    if lower.contains("sys/types.h") && lower.contains("no such file") || lower.contains("invalid active developer path") || lower.contains("unable to find utility") {
+        return SetupDiagnostic(code:"mac-sdk",title:"Mac build tools need attention",
+            message:"The compiler cannot find the macOS system headers or selected Apple tools.",
+            recovery:"Update Apple Command Line Tools in System Settings > General > Software Update. If you use Xcode, open it and finish setup. Then choose Prepare Build Tools and Build / Resume. Existing downloads are kept.")
+    }
+    return nil
+}
+func savedDiagnostic(_ url: URL) -> SetupDiagnostic? {
+    guard let data=try? Data(contentsOf:url),data.count<=65536 else{return nil}
+    return try? JSONDecoder().decode(SetupDiagnostic.self,from:data)
+}
+
 func identifyGame(_ url: URL) -> String? {
     guard let handle=try? FileHandle(forReadingFrom:url) else { return nil }
     let header=(try? handle.read(upToCount:8)) ?? Data();try? handle.close()
@@ -48,7 +76,7 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let log=NSTextView(), progress=NSProgressIndicator()
     let build=NSButton(title:"Build / Resume",target:nil,action:nil)
     let cancel=NSButton(title:"Cancel",target:nil,action:nil)
-    var process: Process?, preparing=false, stopped=false
+    var process: Process?, preparing=false, stopped=false, recentOutput=""
     var kit: URL { Bundle.main.resourceURL!.appendingPathComponent("SourceKit") }
     var cancelFile: URL {destination.appendingPathComponent("work/setup.cancel")}
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -111,7 +139,19 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
     @objc func openLog() {
         let path=destination.appendingPathComponent("setup.log")
-        NSWorkspace.shared.open(FileManager.default.fileExists(atPath:path.path) ? path : destination)
+        let gui=destination.appendingPathComponent("setup-gui.log")
+        NSWorkspace.shared.open(FileManager.default.fileExists(atPath:path.path) ? path : FileManager.default.fileExists(atPath:gui.path) ? gui : destination)
+    }
+    func failed(_ diagnostic: SetupDiagnostic?) {
+        guard let diagnostic else {status.stringValue="Setup stopped. Open Setup Log for details. Verified downloads are kept.";return}
+        status.stringValue=diagnostic.title+". Follow the repair instructions, then retry."
+        append("\n"+diagnostic.title+"\n"+diagnostic.message+"\n"+diagnostic.recovery+"\n")
+        let alert=NSAlert();alert.alertStyle = .warning;alert.messageText=diagnostic.title
+        alert.informativeText=diagnostic.message+"\n\n"+diagnostic.recovery
+        alert.addButton(withTitle:"OK");alert.addButton(withTitle:"Open Setup Log")
+        alert.beginSheetModal(for:window) { [weak self] response in
+            if response == .alertSecondButtonReturn {self?.openLog()}
+        }
     }
     @objc func stop() {
         guard process != nil else{return};stopped=true;status.stringValue="Stopping safely. Verified downloads will be kept…";cancel.isEnabled=false
@@ -123,14 +163,25 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
         var environment=ProcessInfo.processInfo.environment
         environment["PATH"]="/opt/homebrew/opt/python@3.12/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
         environment["PYTHONUNBUFFERED"]="1";environment["SSL_CERT_FILE"]="/etc/ssl/cert.pem"
-        task.environment=environment;task.standardOutput=pipe;task.standardError=pipe
+        task.environment=environment;task.standardOutput=pipe;task.standardError=pipe;recentOutput=""
         pipe.fileHandleForReading.readabilityHandler={ [weak self] handle in
             let data=handle.availableData;guard !data.isEmpty else{return}
-            DispatchQueue.main.async{self?.append(String(decoding:data,as:UTF8.self))}
+            DispatchQueue.main.async{
+                guard let self else{return};let text=String(decoding:data,as:UTF8.self)
+                self.recentOutput=String((self.recentOutput+text).suffix(16384));self.append(text)
+            }
         }
-        task.terminationHandler={ [weak self] task in DispatchQueue.main.async {
-            pipe.fileHandleForReading.readabilityHandler=nil;self?.process=nil;completion(task.terminationStatus)
-        }}
+        task.terminationHandler={ [weak self] task in
+            pipe.fileHandleForReading.readabilityHandler=nil
+            let remainder=pipe.fileHandleForReading.readDataToEndOfFile()
+            DispatchQueue.main.async {
+                if !remainder.isEmpty,let self {
+                    let text=String(decoding:remainder,as:UTF8.self)
+                    self.recentOutput=String((self.recentOutput+text).suffix(16384));self.append(text)
+                }
+                self?.process=nil;completion(task.terminationStatus)
+            }
+        }
         process=task;build.isEnabled=false;cancel.isEnabled=true
         do {try task.run()} catch {process=nil;append(error.localizedDescription+"\n");completion(1)}
     }
@@ -152,7 +203,11 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
             status.stringValue="Preparing build tools…";let command=commands[index]
             execute(command.0,command.1) { [weak self] code in
                 guard let self else{return}
-                if code==0 {next(index+1)} else {self.preparing=false;self.cancel.isEnabled=false;self.accept([]);self.status.stringValue="Tool setup stopped. See the log, then retry."}
+                if code==0 {next(index+1)} else {
+                    self.preparing=false;self.cancel.isEnabled=false;self.accept([])
+                    if self.stopped {self.status.stringValue="Tool preparation stopped. Retry when ready."}
+                    else {self.failed(toolDiagnostic(self.recentOutput))}
+                }
             }
         }
         append("Preparing Homebrew build packages and a private Python environment with Pillow 11.3.0. Homebrew may show its own permission prompts.\n");next(0)
@@ -175,14 +230,24 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
             var arguments=[target.appendingPathComponent("release/Setup.py").path,"--rom",rom.path,"--melee",melee.path,"--cancel-file",cancelFile.path,"--launch"]
             if CommandLine.arguments.contains("--check"){arguments=Array(arguments.dropLast())+["--check"]}
             try? FileManager.default.removeItem(at:cancelFile)
+            try? FileManager.default.removeItem(at:destination.appendingPathComponent("work/setup-error.json"))
             status.stringValue="Checking your files and available build space…"
             execute(python,arguments) { [weak self] code in
                 guard let self else{return};self.cancel.isEnabled=false;self.accept([])
-                self.status.stringValue=code==0 ? "Ready. Super Melee 64 has been built." : code==130 || self.stopped ? "Stopped safely. Choose Build / Resume to continue." : "Setup stopped. Open Setup Log for details."
+                if code==0 {self.status.stringValue="Ready. Super Melee 64 has been built."}
+                else if code==130 || self.stopped {self.status.stringValue="Stopped safely. Choose Build / Resume to continue."}
+                else {self.failed(savedDiagnostic(self.destination.appendingPathComponent("work/setup-error.json")) ?? toolDiagnostic(self.recentOutput))}
             }
         } catch {status.stringValue=error.localizedDescription;append(error.localizedDescription+"\n");accept([])}
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender:NSApplication)->Bool {process==nil}
+}
+if let index=CommandLine.arguments.firstIndex(of:"--diagnose-output"),index+1<CommandLine.arguments.count {
+    let output=(try? String(contentsOfFile:CommandLine.arguments[index+1],encoding:.utf8)) ?? ""
+    if let diagnostic=toolDiagnostic(output) {
+        print(String(decoding:try! JSONEncoder().encode(diagnostic),as:UTF8.self));exit(0)
+    }
+    exit(2)
 }
 if CommandLine.arguments.contains("--validate") {
     var results:[String:String]=[:]

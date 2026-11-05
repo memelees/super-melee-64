@@ -80,6 +80,7 @@ extern int smb_native_grab_borrowed(unsigned,unsigned);
 extern void smb_native_remote_test(const SmbOutput*);
 extern void smb_native_water_test(void);
 static void smb_native_actor_world_test(void);
+static void smb_native_copy_test(Fighter*);
 extern void smb_native_remote_state(Fighter*,SmbFighterState*);
 extern void smb_native_remote_model(Fighter*,SmbFighterModel*);
 extern int smb_native_remote_controlled(Fighter*);
@@ -159,6 +160,7 @@ void smb_embed_after_tick(void) {
         }
         smb_native_water_test();
         smb_native_actor_world_test();
+        smb_native_copy_test(fp);
         memset(&output,0,sizeof output);SmbOutput* destination=&output;
         SmbOutput out={0};out.magic=SMB_MAGIC;out.sequence=input.sequence;
         out.reserved=ticks-180;
@@ -609,3 +611,4 @@ int smb_embed_stair(unsigned ordinal,float* point,float* normal,float* rise,floa
 
 #include "melee_network_combat.inc"
 #include "melee_actor_environment.inc"
+#include "melee_copy_test.inc"

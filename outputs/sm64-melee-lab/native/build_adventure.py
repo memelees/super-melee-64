@@ -52,9 +52,31 @@ def build():
             '        if(i==0&&getenv("SMB_PLAYER_COSTUME"))color=strtoul(getenv("SMB_PLAYER_COSTUME"),NULL,10)%variants;\n        player->color=color;player->sub_color=0;expected_costumes[i]=color;')
     if 'void smb_native_expect_costume(' not in source:source+='\nvoid smb_native_expect_costume(unsigned seat,unsigned costume){if(seat<GM_MAX_PLAYERS)expected_costumes[seat]=costume;}\n'
     compile_game('src/pc/m3d_lab.c',source,('-Dm3d_lab_tick=m3d_lab_tick_original','-Dm3d_lab_pad=m3d_lab_pad_original'))
-    # The current Smash Royale ground line/ring, using our live SM64 floor provider.
+    # Circular ground shadows use the live SM64 floor provider; no height lines.
     marker=(HERE/'smash_royale_ground_markers.c').read_text()
     compile_game('src/pc/world/m3d_arena_visual.c',marker)
+    # Campaign opponents and player swaps can appear after Melee's match-start
+    # preload. Load a swallowed retail fighter's copy archive and Kirby costume
+    # before its hat/article callbacks dereference that archive (notably Peach).
+    source='#include <stdlib.h>\nextern int smb_embed_active(void);\n'+(OUT/'abi/src/melee/ft/kinds/ftKirby/ftkirby.c').read_text()
+    boundary='''    Fighter* fp = gobj->user_data;
+    HSD_GObjEvent cb;
+
+    if (fp->u.kb.hat.kind != kind) {'''
+    if source.count(boundary)!=1:raise RuntimeError('Unexpected Kirby copy boundary')
+    source=source.replace(boundary,'''    Fighter* fp = gobj->user_data;
+    HSD_GObjEvent cb;
+
+    if (smb_embed_active()) {
+        if (kind < 0 || kind >= Ft_Kind_Akaneia0) kind = Ft_Kind_Kirby;
+        if (kind != Ft_Kind_Kirby) {
+            if (!ftKb_Init_803CA9D0[kind].filename) kind = Ft_Kind_Kirby;
+            else ftKb_SpecialN_800EED50(kind, fp->costume_id);
+        }
+        if (getenv("SMB_SCENARIO")) fprintf(stderr,"SMB KIRBY COPY kind=%d costume=%u ready=%d\\n",kind,fp->costume_id,kind==Ft_Kind_Kirby||ft_80459B88.copies[kind]!=NULL);
+    }
+    if (fp->u.kb.hat.kind != kind) {''')
+    compile_game('src/melee/ft/kinds/ftKirby/ftkirby.c',source)
     source='extern int smb_embed_active(void);\n#include <melee/ft/types.h>\nextern Fighter* smb_native_campaign_target(Fighter*);\n'+(OUT/'abi/src/pc/world/m3d_cpu.c').read_text()
     boundary='    if (fp->cpu.kind == CpuKind_Nana) {'
     source=source.replace(boundary,'''    if(smb_embed_active() && fp->player_idx>0 && fp->cpu.kind!=CpuKind_Nana) {

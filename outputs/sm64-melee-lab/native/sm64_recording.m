@@ -144,7 +144,6 @@ extern int smb_host_option(unsigned,int);
 extern void smb_host_spawn_menu_request(void);
 @interface SmbRecordingActions:NSObject
 - (void)walls:(id)sender;
-- (void)lines:(id)sender;
 - (void)spawn:(id)sender;
 - (void)host:(id)sender;
 - (void)join:(id)sender;
@@ -165,7 +164,6 @@ static void coop_launch(NSString* address) {
     if([alert runModal]==NSAlertFirstButtonReturn)coop_launch([input.stringValue stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet]);
 }
 - (void)walls:(id)sender{(void)sender;smb_host_option(0,1);}
-- (void)lines:(id)sender{(void)sender;smb_host_option(1,1);}
 - (void)spawn:(id)sender{(void)sender;smb_host_spawn_menu_request();}
 - (void)toggle:(id)sender{(void)sender;smb_record_toggle();}
 - (void)folder:(id)sender{(void)sender;NSString* folder=recordings_folder();[NSFileManager.defaultManager createDirectoryAtPath:folder withIntermediateDirectories:YES attributes:nil error:nil];[NSWorkspace.sharedWorkspace openURL:[NSURL fileURLWithPath:folder isDirectory:YES]];}
@@ -180,15 +178,15 @@ void smb_record_menu_update(void){
         if(!recordActions)recordActions=[SmbRecordingActions new];
         gameplay=[[NSMenuItem alloc]initWithTitle:@"Gameplay" action:nil keyEquivalent:@""];
         NSMenu* menu=[[NSMenu alloc]initWithTitle:@"Gameplay"];menu.autoenablesItems=NO;gameplay.submenu=menu;
-        NSArray* titles=@[@"Wall Jump with Every Character",@"Enemy Ground Lines",@"Spawn Enemy…"];
-        SEL actions[]={@selector(walls:),@selector(lines:),@selector(spawn:)};
-        for(unsigned i=0;i<3;i++){NSMenuItem* item=[[NSMenuItem alloc]initWithTitle:titles[i] action:actions[i] keyEquivalent:@""];item.target=recordActions;[menu addItem:item];}
+        NSArray* titles=@[@"Wall Jump with Every Character",@"Spawn Enemy…"];
+        SEL actions[]={@selector(walls:),@selector(spawn:)};
+        for(unsigned i=0;i<2;i++){NSMenuItem* item=[[NSMenuItem alloc]initWithTitle:titles[i] action:actions[i] keyEquivalent:@""];item.target=recordActions;[menu addItem:item];}
         [menu addItem:NSMenuItem.separatorItem];
         NSMenuItem* host=[[NSMenuItem alloc]initWithTitle:@"Host Co-op (16 Players)" action:@selector(host:) keyEquivalent:@""];host.target=recordActions;[menu addItem:host];
         NSMenuItem* join=[[NSMenuItem alloc]initWithTitle:@"Join Co-op…" action:@selector(join:) keyEquivalent:@""];join.target=recordActions;[menu addItem:join];
         [NSApp.mainMenu addItem:gameplay];
     }
-    for(unsigned i=0;i<2;i++)[gameplay.submenu itemAtIndex:i].state=smb_host_option(i,0)?NSControlStateValueOn:NSControlStateValueOff;
+    [gameplay.submenu itemAtIndex:0].state=smb_host_option(0,0)?NSControlStateValueOn:NSControlStateValueOff;
     if(!recordMenuItem||![NSApp.mainMenu.itemArray containsObject:recordMenuItem]) {
         if(!recordActions)recordActions=[SmbRecordingActions new];NSMenu* menu=[[NSMenu alloc]initWithTitle:@"Recording"];menu.autoenablesItems=NO;
         recordMenuItem=[[NSMenuItem alloc]initWithTitle:@"Recording" action:nil keyEquivalent:@""];recordMenuItem.submenu=menu;

@@ -90,7 +90,7 @@ def refresh():
     plan['bridge_compiler']=compiler('/pc/m3d_lab.c')
     plan['archiver']=shutil.which('x86_64-w64-mingw32-ar') or 'ar' if WINDOWS else 'ar'
     # DAT scalars keep their original byte order; GCC implements that ABI.
-    plan['game_compiler'][0]=shutil.which('x86_64-w64-mingw32-gcc') if WINDOWS else (shutil.which('gcc-16') or shutil.which('gcc-15') or 'gcc')
+    plan['game_compiler'][0]=shutil.which('x86_64-w64-mingw32-gcc') if WINDOWS else (os.environ.get('GCC_BIN') or shutil.which('gcc-16') or shutil.which('gcc-15') or 'gcc')
     plan['game_compiler'][1:1]=['-fexec-charset=CP932','-Wno-scalar-storage-order']
     plan['game_compiler']=[s for s in plan['game_compiler'] if s!='-fcolor-diagnostics']
     plan['gpu_compiler']+=['-I',str(OUT/'abi/aurora-lib'),'-I',str(HERE)]

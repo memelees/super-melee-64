@@ -75,8 +75,8 @@ original Mario enemies and bosses.
 | Summon next stage round | F8 | L3 |
 | Record gameplay | F9 | Mac Recording menu |
 
-F7 opens the enemy picker. F10 toggles universal wall jumps; F11 toggles enemy
-height lines. Both toggles default off. In water, Q/LB rises and E/LT dives;
+F7 opens the enemy picker. F10 toggles universal wall jumps (default off).
+Fighters use circular ground shadows without height lines. In water, Q/LB rises and E/LT dives;
 forward movement holds depth. Jumps and specials remain usable. Coins restore
 SM64 air and heal ten damage percentage points per coin value.
 
