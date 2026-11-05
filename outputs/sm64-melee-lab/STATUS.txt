@@ -1,0 +1,19 @@
+Super Melee 64 — 0.6.0-beta.1 / native14
+
+Source beta for local builds. Public source and downloads:
+https://github.com/memelees/super-melee-64
+
+This beta adds a cancellable/resumable source installer, verified official
+patch downloads, native Windows launcher, asset-free CI, packet bounds checks,
+connection-bound sender admission, and fixed-content co-op without remote
+mod/Lua/file exchange. Matching SuperMelee64-native14-beta1 clients are required.
+
+Apple Silicon/macOS 15+ is the primary tested target. Windows x64 is an
+experimental beta. No full 120-star, sixteen-person, Internet/NAT or real
+Windows playthrough is claimed. Current game-test scope and pass/fail results
+are recorded in verification/beta-acceptance.json.
+
+See release/START HERE.txt for installation, controls, saves, co-op, recording
+and limitations. See LICENSE, LICENSING.md and THIRD-PARTY.txt for scope and
+upstream notices. Only source kits are distributable; never share generated
+apps, game assets, disc images, saves or recordings with a source release.

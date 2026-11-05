@@ -1,0 +1,157 @@
+--- a/pc/main.c
++++ b/pc/main.c
+@@ -27,6 +27,8 @@
+ #include "pc/launcher.h"
+ 
+ int melee_main(void);
++static SDL_Window* smb_embed_window;
++void smb_embed_hide_window(void) { if(smb_embed_window) SDL_HideWindow(smb_embed_window); }
+ 
+ #if defined(__ANDROID__)
+ #include <android/log.h>
+@@ -305,7 +307,7 @@
+ #include "pc/net_lan.h"
+ #include <signal.h>
+ 
+-static void pc_shutdown_once(void) {
++void pc_shutdown_once(void) {
+     static bool done;
+     if (done) {
+         return;
+@@ -465,13 +467,7 @@
+     }
+ }
+ 
+-MELEE_EXPORT int main(int argc, char* argv[]) {
+-#ifdef _WIN32
+-    /* DELFINO: reserve the VM's opaque guest pointer window before Aurora
+-     * picks a low native MEM1 arena. The two address spaces must not alias. */
+-    extern void m3d_guest_init(void);
+-    m3d_guest_init();
+-#endif
++int smb_melee_main(int argc, char* argv[]) {
+     melee_install_crash_handler(); /* before anything can crash */
+     pc_env_file_bootstrap();       /* before anything calls getenv() */
+ #if defined(_WIN32)
+@@ -558,7 +554,8 @@
+         resources_path, sizeof resources_path, "%sresources/", base_path != NULL ? base_path : "");
+ #endif
+ 
+-    char* user_path = pc_get_pref_path();
++    if(getenv("SM64_MELEE_RESOURCES")) snprintf(resources_path,sizeof resources_path,"%s/",getenv("SM64_MELEE_RESOURCES"));
++    char* user_path = getenv("SM64_MELEE_PROFILE") ? SDL_strdup(getenv("SM64_MELEE_PROFILE")) : pc_get_pref_path();
+     if (user_path == NULL) {
+         fprintf(stderr, "Could not create game data directory: %s\n", SDL_GetError());
+         return 1;
+@@ -596,6 +593,7 @@
+     pc_launcher_configure(&config);
+ 
+     const AuroraInfo info = aurora_initialize(argc, argv, &config);
++    smb_embed_window=info.window;
+ 
+     /* Built-in fallback mappings for common 3rd-party GameCube adapters
+      * (DragonRise / Mayflash in PC mode) so they work out-of-the-box even if
+--- a/pc/vi.c
++++ b/pc/vi.c
+@@ -72,7 +72,21 @@
+ #define pc_pace_wait SDL_DelayPrecise
+ #endif
+ 
++extern int smb_embed_active(void);
++extern void smb_embed_hide_window(void);
++void smb_embed_stop_presentation(void) {
++    if(s_in_frame) {aurora_end_frame();s_in_frame=false;}
++    smb_embed_hide_window();
++}
+ void pc_frame_boundary(void) {
++    if(smb_embed_active()) {
++        if(pc_exit_requested)exit(0);
++        s_retrace_count++;pc_os_run_alarms();
++        if(s_pre_cb)s_pre_cb(s_retrace_count);
++        s_current_fb=s_next_fb;
++        if(s_post_cb)s_post_cb(s_retrace_count);
++        return;
++    }
+     static int timing_debug = -1;
+     static int fps_log = -1;
+     static u64 fps_t0;
+--- a/pc/os.c
++++ b/pc/os.c
+@@ -228,7 +228,10 @@
+  * gap: measured at 95% of a core after one injected 25 ms stall. Sleep toward
+  * the earliest alarm instead, at most 1 ms at a time so the loop's own polls
+  * (disc status, card tasks) keep their cadence. */
++extern int smb_embed_active(void);
++extern void smb_embed_alarm_progress(void);
+ void pc_os_wait_alarm(void) {
++    if(smb_embed_active()){smb_embed_alarm_progress();pc_os_run_alarms();return;}
+     BOOL intr = OSDisableInterrupts();
+     OSTime next = 0;
+     for (OSAlarm* a = s_alarms; a; a = a->next) {
+--- a/pc/m3d_lab.c
++++ b/pc/m3d_lab.c
+@@ -130,7 +130,7 @@
+     if (count < 0) {
+         const char* value = getenv("MELEE3D_NATIVE_LAB");
+         count = value ? atoi(value) : 0;
+-        if (count < 2 || count > GM_MAX_PLAYERS) count = 0;
++        if (count < 1 || count > GM_MAX_PLAYERS) count = 0;
+     }
+     return count;
+ }
+--- a/melee/gm/gmscene.c
++++ b/melee/gm/gmscene.c
+@@ -1,3 +1,6 @@
++extern void pc_frame_boundary(void);
++extern int smb_embed_active(void);
++extern void smb_embed_after_tick(void);
+ #include "gmscene.h"
+ #ifdef TARGET_PC
+ #include "pc/net.h"
+@@ -349,6 +352,7 @@
+         OSCheckActiveThreads();
+     }
+     gmMainLib_8046B0F0.xC = false;
++    smb_embed_after_tick();
+     return temp_r25->unk_C != 0;
+ }
+ 
+@@ -470,6 +474,7 @@
+         pc_net_render_audit(false);
+ #endif
+         lb_800195D0();
++        if (0) { /* Embedded host owns rendering, including boot. */
+         GXInvalidateVtxCache();
+         GXInvalidateTexAll();
+         HSD_StartRender(HSD_RP_SCREEN);
+@@ -477,6 +482,7 @@
+         HSD_Init_803755A8();
+         HSD_PerfSetDrawTime();
+         HSD_VICopyXFBAsync(HSD_RP_SCREEN);
++        } else { pc_frame_boundary(); }
+ #ifdef TARGET_PC
+         pc_net_render_audit(true);
+ #endif
+--- a/sysdolphin/baselib/video.c
++++ b/sysdolphin/baselib/video.c
+@@ -1,3 +1,4 @@
++extern int smb_embed_active(void);
+ #include "video.h"
+ 
+ #include "debug.h"
+@@ -360,6 +361,7 @@
+ 
+ void HSD_VIWaitXFBFlush(void)
+ {
++    if(smb_embed_active())return;
+     if (HSD_VIGetNbXFB() < 2) {
+         return;
+     }
+@@ -371,6 +373,7 @@
+ 
+ void HSD_VIWaitXFBFlushNoYield(void)
+ {
++    if(smb_embed_active())return;
+     if (HSD_VIGetNbXFB() < 2) {
+         return;
+     }

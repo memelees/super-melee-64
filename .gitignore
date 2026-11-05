@@ -1,0 +1,87 @@
+# Only the authored source, installer inputs, documentation and text evidence
+# below belong in this repository. Local game data and builds stay untracked.
+/*
+!/.gitignore
+!/README.md
+!/LICENSE
+!/LICENSING.md
+!/CONTRIBUTING.md
+!/SECURITY.md
+!/PUBLIC-SOURCE-MANIFEST.json
+!/.github/
+/.github/*
+!/.github/workflows/
+/.github/workflows/*
+!/.github/workflows/*.yml
+!/.github/ISSUE_TEMPLATE/
+/.github/ISSUE_TEMPLATE/*
+!/.github/ISSUE_TEMPLATE/*.md
+!/docs/
+/docs/*
+!/docs/*.md
+!/outputs/
+/outputs/*
+!/outputs/sm64-melee-lab/
+/outputs/sm64-melee-lab/*
+!/outputs/sm64-melee-lab/native/
+!/outputs/sm64-melee-lab/mod/
+!/outputs/sm64-melee-lab/release/
+!/outputs/sm64-melee-lab/branding/
+!/outputs/sm64-melee-lab/verification/
+!/outputs/sm64-melee-lab/*.txt
+!/outputs/sm64-melee-lab/Recommended Playthrough.html
+
+/outputs/sm64-melee-lab/native/*
+!/outputs/sm64-melee-lab/native/*.py
+!/outputs/sm64-melee-lab/native/*.c
+!/outputs/sm64-melee-lab/native/*.cpp
+!/outputs/sm64-melee-lab/native/*.h
+!/outputs/sm64-melee-lab/native/*.inc
+!/outputs/sm64-melee-lab/native/*.m
+!/outputs/sm64-melee-lab/native/*.patch
+!/outputs/sm64-melee-lab/native/*.json
+
+/outputs/sm64-melee-lab/mod/*
+!/outputs/sm64-melee-lab/mod/*.lua
+
+/outputs/sm64-melee-lab/release/*
+!/outputs/sm64-melee-lab/release/*.py
+!/outputs/sm64-melee-lab/release/*.ps1
+!/outputs/sm64-melee-lab/release/*.swift
+!/outputs/sm64-melee-lab/release/*.cpp
+!/outputs/sm64-melee-lab/release/*.command
+!/outputs/sm64-melee-lab/release/*.cmd
+!/outputs/sm64-melee-lab/release/*.vbs
+!/outputs/sm64-melee-lab/release/*.txt
+!/outputs/sm64-melee-lab/release/SmashRoyale-bootstrap.zip
+
+/outputs/sm64-melee-lab/branding/*
+!/outputs/sm64-melee-lab/branding/Super Melee 64 Rendered.png
+!/outputs/sm64-melee-lab/branding/Super Melee 64.svg
+!/outputs/sm64-melee-lab/branding/Design prompt.txt
+
+/outputs/sm64-melee-lab/verification/*
+!/outputs/sm64-melee-lab/verification/*.json
+
+# Defense in depth for game data, credentials and generated files.
+**/__pycache__/
+**/.DS_Store
+**/.env
+**/.env.*
+**/*.iso
+**/*.gcm
+**/*.z64
+**/*.n64
+**/*.v64
+**/*.rvz
+**/*.dat
+**/*.dol
+**/*.o
+**/*.obj
+**/*.a
+**/*.dylib
+**/*.dll
+**/*.exe
+**/*.mp4
+**/*.sav
+**/*.eep

@@ -1,0 +1,110 @@
+Execution architecture: one process. Embed the native Melee runtime in the
+SM64 host. Let SM64 own world progression and the default camera, with a
+slightly greater preferred follow distance; disable the donor map render.
+Preserve native fighter rendering through
+a character-only graphics adapter, with matching camera and shared depth.
+The current build includes the native graphics adapter. Its implementation
+and remaining validation limits are recorded in STATUS.txt.
+
+SM64 with native Melee fighters — agreed product target
+23 October 2026
+
+The game is Super Mario 64's adventure, with playable Melee/Akaneia fighters.
+SM64 owns courses, objects, enemies, coins, stars, doors, warps, save progress,
+bosses, lives and the ending. A terrain import in Melee is a development fixture
+and does not satisfy the product target.
+
+Rendering direction confirmed in the architecture discussion: SM64 supplies the
+authoritative gameplay camera and world depth. Melee should draw its characters
+and relevant effects without a duplicate visible map or autonomous gameplay
+camera. Preserve native character appearance. The chosen architecture is one operating-system game process.
+INTEGRATION-RESEARCH.txt records source comparisons, integration details and
+the proposed native rendering/depth proof. The native character/item pass now replaces the bone/vertex-color preview.
+
+Single-player acceptance: start a native desktop SM64 save as Link, progress
+through its courses and bosses, save/reload and reach the ending. Cover the full
+star catalogue and identify any character-specific traversal blockers. Preserve
+SM64's progression and interactions while the selected fighter retains its own
+Melee moves and physics. Expand to the existing Melee3D playable roster,
+including Akaneia additions such as Sonic.
+
+Multiplayer acceptance: the same adventure and fighter behavior in Coop Deluxe;
+fighters can battle using actual Melee damage percentages, hitboxes, knockback,
+grabs and throws. Joining, leaving and ownership must preserve consistent state.
+The standalone native port and the co-op port are both targets.
+
+Agreed world adapters: coins heal percentage; Melee attacks affect SM64 enemies;
+doors can open without bespoke fighter animation; water now requires slow
+sinking, kicks, usable specials and SM64 air/drowning rules. Cannons retain an
+SM64-scale launch arc with Melee tumble; wing caps and shells use SM64 travel.
+Other scripted world actions can use SM64 behavior. Defer custom projectile effects. Use SM64's normal world behavior as
+the default when an interaction has no fighter-specific implementation.
+
+Current integration gates include native rendering/simulation, live collision,
+projectile impacts, traversal, moving platforms, doors, painting entry and star
+save/reload. See the current verification report for the exact tested scope.
+The imported Castle Grounds fixture is useful for movement/combat comparisons,
+but cannot establish any adventure or game-completion acceptance.
+
+Current implementation and limits are in STATUS.txt. Two-client native combat,
+shared encounters and level handoff pass; the 16-player capacity is supported.
+Both Windows hosts compile. No full-game/all-roster clear, sixteen-person live
+session, or actual Windows runtime certification has been established.
+
+Audio preference: use SM64 world music, with native Melee character voices and
+sound effects. Disable the donor Melee soundtrack in the embedded runtime.
+Combat presentation: render the native Melee percentage HUD and use native
+percentage/weight-dependent launches in place of ordinary SM64 combat HP loss.
+
+Additional traversal/presentation targets (24 October 2026): steep hills should
+use SM64 sliding rules without falling through the ramp; respawns should use
+Melee's actual platform; preserve native character/item effects and sounds while
+keeping Melee music muted. Current verified scope is in environment-update.json.
+
+25 October 2026 update: use the latest Melee3D orbit camera for normal gameplay
+and apply that same view/projection to both renderers. Preserve SM64 cameras for
+scripted interactions. Refresh the private embedded Melee3D snapshot to include
+the newer control/audio fixes. Melee3D and SM64 development/builds must operate
+independently, without a shared launcher lock, mutable compiler inputs, profiles
+or asset staging. Normal play should run as one game process.
+
+25 October presentation/interactions: match the physical host resolution and
+carry native fractional transparency/effect blending through to SM64. Native
+grabs should pick up SM64 objects and Bowser's tail, with SM64 swinging/throwing.
+Keep SM64 world-event sounds where appropriate. Shielding protects against world
+attacks. Star collection plays the fighter's native Melee/Akaneia victory pose.
+Replace the Mario lives portrait with the selected fighter's native stock icon,
+while retaining SM64's lives count.
+
+25 October later playtest update (supersedes the orbit-camera preference):
+Use SM64's stock camera, preferring a little more distance. Enter gameplay
+automatically without a click/start screen. Suppress Mario's startup, grab,
+damage and thrown vocals. Use the selected Melee character's damage sounds
+where available; otherwise stay silent. Steep slopes use a stable crouched
+pose with no shield drain or ordinary walking. Keep host grabs/throws/deaths
+and native fighter rendering/respawn synchronized, including Heave-Ho and
+King Bob-omb.
+
+Throw/cannon refinement: keep SM64's holding and cannon aiming sequences, but
+on release pass position, angle and speed to the native fighter. Melee should
+then own the flight/tumble and permit its normal aerial movement/recovery;
+do not leave a frozen fighter travelling along Mario's simulated trajectory.
+
+25 October CPU/selection update: add hostile native Melee CPUs at difficulty 9
+while the player progresses through the SM64 adventure. Add a Melee-style
+character selector and show only the SM64 window throughout startup. The
+implemented default is three enemies, with a 0..3 count/solo choice on that
+screen. Keep all rendering and simulation in the same game process.
+Keep the enemy squad following the player through rooms and levels. Queue
+safe rejoining across doors, paintings, warps and area changes, including
+changes that happen while SM64 controls a scripted animation. Place every
+CPU on valid ground in the destination room and retry airborne entrances.
+
+Squad configuration: choose 0..3 hostile CPUs and each CPU's fighter using the
+same native Melee-style portrait picker/player cards as the human. Show all
+occupied slots' character icons and live damage percentages along the bottom.
+Catch-up teleports should place enemies between their old position and the
+player, never immediately around the player. Give the player a three-second
+active-gameplay head start after doors, room/area/level transitions and respawns;
+rejoin around the entrance so the player's travel during that interval counts.
+Preserve enemy damage across catch-up and transition placement.

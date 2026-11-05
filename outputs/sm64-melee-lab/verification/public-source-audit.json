@@ -1,0 +1,24 @@
+{
+  "passed": true,
+  "current_files_checked": 156,
+  "tracked_files": 0,
+  "proposed_nonignored_files": 156,
+  "history_checked": false,
+  "history_commits": 0,
+  "commit_actor_and_local_git_metadata_checked": false,
+  "historical_blobs_checked": 0,
+  "private_terms_configured": 5,
+  "finding_counts": {},
+  "findings": [],
+  "bootstrap": {
+    "files": 148,
+    "all_payload_hashes_verified": true,
+    "all_payloads_utf8_text": true,
+    "patches": 1,
+    "upstream_game_files_touched_by_patches": 154,
+    "patch_context_lines": 5027,
+    "distribution_permissions_not_certified": true
+  },
+  "scope": "Git-selected source candidates and reachable history, or an exact source-export manifest. Ignored game/build folders are never scanned. Findings omit matched values and private commit metadata.",
+  "legal_clearance_claimed": false
+}

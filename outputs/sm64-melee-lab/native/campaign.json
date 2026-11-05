@@ -1,0 +1,739 @@
+{
+  "version": 1,
+  "title": "Super Melee 64",
+  "roster_forms": 33,
+  "stages": [
+    {
+      "stage": 0,
+      "course": 0,
+      "name": "Castle Grounds",
+      "player": "link",
+      "theme": "A gentle green rival on the grass outside Peach’s castle.",
+      "waves": [
+        [
+          {
+            "character": "yoshi",
+            "external": 17,
+            "level": 3,
+            "costume_variant": 0
+          }
+        ]
+      ]
+    },
+    {
+      "stage": 1,
+      "course": 0,
+      "name": "Inside the Castle",
+      "player": "link",
+      "theme": "One royal guard, never a three-fighter ambush.",
+      "waves": [
+        [
+          {
+            "character": "peach",
+            "external": 12,
+            "level": 5,
+            "costume_variant": 0
+          }
+        ]
+      ]
+    },
+    {
+      "stage": 2,
+      "course": 0,
+      "name": "Castle Courtyard",
+      "player": "luigi",
+      "theme": "A haunted-castle preview before Big Boo.",
+      "waves": [
+        [
+          {
+            "character": "ness",
+            "external": 11,
+            "level": 4,
+            "costume_variant": 0
+          }
+        ]
+      ]
+    },
+    {
+      "stage": 3,
+      "course": 1,
+      "name": "Bob-omb Battlefield",
+      "player": "mario",
+      "theme": "The heavy summit rival gives way to a nimble jungle challenger.",
+      "waves": [
+        [
+          {
+            "character": "dk",
+            "external": 1,
+            "level": 5,
+            "costume_variant": 0
+          }
+        ],
+        [
+          {
+            "character": "diddy",
+            "external": 35,
+            "level": 4,
+            "costume_variant": 0
+          }
+        ]
+      ],
+      "stars": [
+        "Big Bob-Omb On The Summit",
+        "Footrace With Koopa The Quick",
+        "Shoot To The Island In The Sky",
+        "Find The 8 Red Coins",
+        "Mario Wings To The Sky",
+        "Behind Chain Chomp'S Gate",
+        "100 Coins"
+      ]
+    },
+    {
+      "stage": 4,
+      "course": 2,
+      "name": "Whomp’s Fortress",
+      "player": "luigi",
+      "theme": "Mario-family duels on a classic platforming fortress.",
+      "waves": [
+        [
+          {
+            "character": "mario",
+            "external": 8,
+            "level": 5,
+            "costume_variant": 0
+          }
+        ],
+        [
+          {
+            "character": "drmario",
+            "external": 22,
+            "level": 4,
+            "costume_variant": 0
+          }
+        ]
+      ],
+      "stars": [
+        "Chip Off Whomp'S Block",
+        "To The Top Of The Fortress",
+        "Shoot Into The Wild Blue",
+        "Red Coins On The Floating Isle",
+        "Fall Onto The Caged Island",
+        "Blast Away The Wall",
+        "100 Coins"
+      ]
+    },
+    {
+      "stage": 5,
+      "course": 3,
+      "name": "Jolly Roger Bay",
+      "player": "younglink",
+      "theme": "Zelda guards the sunken treasure and sea cavern.",
+      "waves": [
+        [
+          {
+            "character": "zelda",
+            "external": 18,
+            "level": 5,
+            "costume_variant": 0
+          }
+        ]
+      ],
+      "stars": [
+        "Plunder In The Sunken Ship",
+        "Can The Eel Come Out To Play?",
+        "Treasure Of The Ocean Cave",
+        "Red Coins On The Ship Afloat",
+        "Blast To The Stone Pillar",
+        "Through The Jet Stream",
+        "100 Coins"
+      ]
+    },
+    {
+      "stage": 6,
+      "course": 4,
+      "name": "Cool, Cool Mountain",
+      "player": "iceclimbers",
+      "theme": "A snow princess followed by a penguin king, facing the player’s climbers.",
+      "waves": [
+        [
+          {
+            "character": "peach",
+            "external": 12,
+            "level": 4,
+            "costume_variant": 0
+          }
+        ],
+        [
+          {
+            "character": "dedede",
+            "external": 39,
+            "level": 5,
+            "costume_variant": 0
+          }
+        ]
+      ],
+      "stars": [
+        "Slip Slidin' Away",
+        "Li'L Penguin Lost",
+        "Big Penguin Race",
+        "Frosty Slide For 8 Red Coins",
+        "Snowman'S Lost His Head",
+        "Wall Kicks Will Work",
+        "100 Coins"
+      ]
+    },
+    {
+      "stage": 7,
+      "course": 5,
+      "name": "Big Boo’s Haunt",
+      "player": "ness",
+      "theme": "Luigi and Lucas haunt the house before a stronger psychic boss.",
+      "waves": [
+        [
+          {
+            "character": "luigi",
+            "external": 7,
+            "level": 3,
+            "costume_variant": 0
+          },
+          {
+            "character": "lucas",
+            "external": 37,
+            "level": 3,
+            "costume_variant": 0
+          }
+        ],
+        [
+          {
+            "character": "mewtwo",
+            "external": 10,
+            "level": 6,
+            "costume_variant": 0
+          }
+        ]
+      ],
+      "stars": [
+        "Go On A Ghost Hunt",
+        "Ride Big Boo'S Merry-Go-Round",
+        "Secret Of The Haunted Books",
+        "Seek The 8 Red Coins",
+        "Big Boo'S Balcony",
+        "Eye To Eye In The Secret Room",
+        "100 Coins"
+      ]
+    },
+    {
+      "stage": 8,
+      "course": 6,
+      "name": "Hazy Maze Cave",
+      "player": "sheik",
+      "theme": "Zelda explorers in the underground maze.",
+      "waves": [
+        [
+          {
+            "character": "link",
+            "external": 6,
+            "level": 5,
+            "costume_variant": 0
+          }
+        ],
+        [
+          {
+            "character": "younglink",
+            "external": 21,
+            "level": 6,
+            "costume_variant": 0
+          }
+        ]
+      ],
+      "stars": [
+        "Swimming Beast In The Cavern",
+        "Elevate For 8 Red Coins",
+        "Metal-Head Mario Can Move!",
+        "Navigating The Toxic Maze",
+        "A-Maze-Ing Emergency Exit",
+        "Watch For Rolling Rocks",
+        "100 Coins"
+      ]
+    },
+    {
+      "stage": 9,
+      "course": 7,
+      "name": "Lethal Lava Land",
+      "player": "samus",
+      "theme": "Two fire creatures, one at a time.",
+      "waves": [
+        [
+          {
+            "character": "charizard",
+            "external": 36,
+            "level": 6,
+            "costume_variant": 0
+          }
+        ],
+        [
+          {
+            "character": "bowser",
+            "external": 5,
+            "level": 7,
+            "costume_variant": 0
+          }
+        ]
+      ],
+      "stars": [
+        "Boil The Big Bully",
+        "Bully The Bullies",
+        "8-Coin Puzzle With 15 Pieces",
+        "Red-Hot Log Rolling",
+        "Hot-Foot-It Into The Volcano",
+        "Elevator Tour In The Volcano",
+        "100 Coins"
+      ]
+    },
+    {
+      "stage": 10,
+      "course": 8,
+      "name": "Shifting Sand Land",
+      "player": "ganondorf",
+      "theme": "A swordsman guards the desert pyramid against Ganondorf.",
+      "waves": [
+        [
+          {
+            "character": "marth",
+            "external": 9,
+            "level": 6,
+            "costume_variant": 0
+          }
+        ]
+      ],
+      "stars": [
+        "In The Talons Of The Big Bird",
+        "Shining Atop The Pyramid",
+        "Inside The Ancient Pyramid",
+        "Stand Tall On The Four Pillars",
+        "Free Flying For 8 Red Coins",
+        "Pyramid Puzzle",
+        "100 Coins"
+      ]
+    },
+    {
+      "stage": 11,
+      "course": 9,
+      "name": "Dire, Dire Docks",
+      "player": "samus",
+      "theme": "A Star Fox pilot patrols the submarine base.",
+      "waves": [
+        [
+          {
+            "character": "fox",
+            "external": 2,
+            "level": 6,
+            "costume_variant": 0
+          }
+        ]
+      ],
+      "stars": [
+        "Board Bowser'S Sub",
+        "Chests In The Current",
+        "Pole-Jumping For Red Coins",
+        "Through The Jet Stream",
+        "The Manta Ray'S Reward",
+        "Collect The Caps...",
+        "100 Coins"
+      ]
+    },
+    {
+      "stage": 12,
+      "course": 10,
+      "name": "Snowman’s Land",
+      "player": "dedede",
+      "theme": "An electric rival followed by the Ice Climbers on the frozen mountain.",
+      "waves": [
+        [
+          {
+            "character": "pikachu",
+            "external": 13,
+            "level": 7,
+            "costume_variant": 1
+          }
+        ],
+        [
+          {
+            "character": "iceclimbers",
+            "external": 14,
+            "level": 6,
+            "costume_variant": 1
+          }
+        ]
+      ],
+      "stars": [
+        "Snowman'S Big Head",
+        "Chill With The Bully",
+        "In The Deep Freeze",
+        "Whirl From The Freezing Pond",
+        "Shell Shreddin' For Red Coins",
+        "Into The Igloo",
+        "100 Coins"
+      ]
+    },
+    {
+      "stage": 13,
+      "course": 11,
+      "name": "Wet-Dry World",
+      "player": "pikachu",
+      "theme": "A mechanical silhouette, then an armored fighter and a weaker electric partner.",
+      "waves": [
+        [
+          {
+            "character": "gamewatch",
+            "external": 3,
+            "level": 6,
+            "costume_variant": 0
+          }
+        ],
+        [
+          {
+            "character": "samus",
+            "external": 16,
+            "level": 4,
+            "costume_variant": 0
+          },
+          {
+            "character": "pichu",
+            "external": 24,
+            "level": 3,
+            "costume_variant": 0
+          }
+        ]
+      ],
+      "stars": [
+        "Shocking Arrow Lifts!",
+        "Top O' The Town",
+        "Secrets In The Shallows & Sky",
+        "Express Elevator--Hurry Up!",
+        "Go To Town For Red Coins",
+        "Quick Race Through Downtown!",
+        "100 Coins"
+      ]
+    },
+    {
+      "stage": 14,
+      "course": 12,
+      "name": "Tall, Tall Mountain",
+      "player": "sonic",
+      "theme": "Falcon’s speed and Tails’s flight challenge Sonic on the mountain.",
+      "waves": [
+        [
+          {
+            "character": "falcon",
+            "external": 0,
+            "level": 7,
+            "costume_variant": 0
+          }
+        ],
+        [
+          {
+            "character": "tails",
+            "external": 40,
+            "level": 5,
+            "costume_variant": 0
+          }
+        ]
+      ],
+      "stars": [
+        "Scale The Mountain",
+        "Mystery Of The Monkey Cage",
+        "Scary 'Shrooms, Red Coins",
+        "Mysterious Mountainside",
+        "Breathtaking View From Bridge",
+        "Blast To The Lonely Mushroom",
+        "100 Coins"
+      ]
+    },
+    {
+      "stage": 15,
+      "course": 13,
+      "name": "Tiny-Huge Island",
+      "player": "kirby",
+      "theme": "A lighter floaty team for a world built around scale.",
+      "waves": [
+        [
+          {
+            "character": "yoshi",
+            "external": 17,
+            "level": 4,
+            "costume_variant": 0
+          },
+          {
+            "character": "jigglypuff",
+            "external": 15,
+            "level": 3,
+            "costume_variant": 0
+          }
+        ]
+      ],
+      "stars": [
+        "Pluck The Piranha Flower",
+        "The Tip Top Of The Huge Island",
+        "Rematch With Koopa The Quick",
+        "Five Itty Bitty Secrets",
+        "Wiggler'S Red Coins",
+        "Make Wiggler Squirm",
+        "100 Coins"
+      ]
+    },
+    {
+      "stage": 16,
+      "course": 14,
+      "name": "Tick Tock Clock",
+      "player": "fox",
+      "theme": "A clockwork silhouette followed by two Star Fox pilots, one at a time.",
+      "waves": [
+        [
+          {
+            "character": "gamewatch",
+            "external": 3,
+            "level": 6,
+            "costume_variant": 0
+          }
+        ],
+        [
+          {
+            "character": "falco",
+            "external": 20,
+            "level": 7,
+            "costume_variant": 0
+          }
+        ],
+        [
+          {
+            "character": "wolf",
+            "external": 34,
+            "level": 8,
+            "costume_variant": 0
+          }
+        ]
+      ],
+      "stars": [
+        "Roll Into The Cage",
+        "The Pit And The Pendulums",
+        "Get A Hand",
+        "Stomp On The Thwomp",
+        "Timed Jumps On Moving Bars",
+        "Stop Time For Red Coins",
+        "100 Coins"
+      ]
+    },
+    {
+      "stage": 17,
+      "course": 15,
+      "name": "Rainbow Ride",
+      "player": "marth",
+      "theme": "A sky-high speed duel followed by a swordsman and a magic princess.",
+      "waves": [
+        [
+          {
+            "character": "falcon",
+            "external": 0,
+            "level": 7,
+            "costume_variant": 0
+          }
+        ],
+        [
+          {
+            "character": "roy",
+            "external": 23,
+            "level": 7,
+            "costume_variant": 0
+          }
+        ],
+        [
+          {
+            "character": "zelda",
+            "external": 18,
+            "level": 8,
+            "costume_variant": 0
+          }
+        ]
+      ],
+      "stars": [
+        "Cruiser Crossing The Rainbow",
+        "The Big House In The Sky",
+        "Coins Amassed In A Maze",
+        "Swingin' In The Breeze",
+        "Tricky Triangles!",
+        "Somewhere Over The Rainbow",
+        "100 Coins"
+      ]
+    },
+    {
+      "stage": 18,
+      "course": 16,
+      "name": "Bowser in the Dark World",
+      "player": "link",
+      "theme": "One rival on the approach; the original SM64 boss remains.",
+      "waves": [
+        [
+          {
+            "character": "bowser",
+            "external": 5,
+            "level": 6,
+            "costume_variant": 1
+          }
+        ]
+      ]
+    },
+    {
+      "stage": 19,
+      "course": 17,
+      "name": "Bowser in the Fire Sea",
+      "player": "charizard",
+      "theme": "A fire rival before the original second Bowser fight.",
+      "waves": [
+        [
+          {
+            "character": "bowser",
+            "external": 5,
+            "level": 7,
+            "costume_variant": 1
+          }
+        ]
+      ]
+    },
+    {
+      "stage": 20,
+      "course": 18,
+      "name": "Bowser in the Sky",
+      "player": "mario",
+      "theme": "A final sequential gauntlet before SM64’s final Bowser.",
+      "waves": [
+        [
+          {
+            "character": "ganondorf",
+            "external": 25,
+            "level": 8,
+            "costume_variant": 1
+          }
+        ],
+        [
+          {
+            "character": "bowser",
+            "external": 5,
+            "level": 8,
+            "costume_variant": 2
+          }
+        ]
+      ]
+    },
+    {
+      "stage": 21,
+      "course": 19,
+      "name": "The Princess’s Secret Slide",
+      "player": "fox",
+      "theme": "A speed rival where there is safe ground; no forced ramp spawn.",
+      "waves": [
+        [
+          {
+            "character": "sonic",
+            "external": 38,
+            "level": 5,
+            "costume_variant": 1
+          }
+        ]
+      ]
+    },
+    {
+      "stage": 22,
+      "course": 20,
+      "name": "Cavern of the Metal Cap",
+      "player": "drmario",
+      "theme": "An armored rival in the metal-cap cavern.",
+      "waves": [
+        [
+          {
+            "character": "samus",
+            "external": 16,
+            "level": 5,
+            "costume_variant": 1
+          }
+        ]
+      ]
+    },
+    {
+      "stage": 23,
+      "course": 21,
+      "name": "Tower of the Wing Cap",
+      "player": "zelda",
+      "theme": "A floating princess guards the tower’s safe platforms.",
+      "waves": [
+        [
+          {
+            "character": "peach",
+            "external": 12,
+            "level": 5,
+            "costume_variant": 0
+          }
+        ]
+      ]
+    },
+    {
+      "stage": 24,
+      "course": 22,
+      "name": "Vanish Cap Under the Moat",
+      "player": "gamewatch",
+      "theme": "An elusive fighter for the hidden obstacle course.",
+      "waves": [
+        [
+          {
+            "character": "sheik",
+            "external": 19,
+            "level": 6,
+            "costume_variant": 1
+          }
+        ]
+      ]
+    },
+    {
+      "stage": 25,
+      "course": 23,
+      "name": "Wing Mario Over the Rainbow",
+      "player": "tails",
+      "theme": "Speed and flight: Sonic followed by Falco on safe ground.",
+      "waves": [
+        [
+          {
+            "character": "sonic",
+            "external": 38,
+            "level": 6,
+            "costume_variant": 1
+          }
+        ],
+        [
+          {
+            "character": "falco",
+            "external": 20,
+            "level": 6,
+            "costume_variant": 1
+          }
+        ]
+      ]
+    },
+    {
+      "stage": 26,
+      "course": 24,
+      "name": "The Secret Aquarium",
+      "player": "pichu",
+      "theme": "A round, floaty rival in the aquarium; NPCs still need safe footing.",
+      "waves": [
+        [
+          {
+            "character": "kirby",
+            "external": 4,
+            "level": 3,
+            "costume_variant": 1
+          }
+        ]
+      ]
+    }
+  ]
+}

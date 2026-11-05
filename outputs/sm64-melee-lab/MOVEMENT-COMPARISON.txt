@@ -1,0 +1,97 @@
+Melee Mario / SM64 Mario — local source and runtime comparison
+24 October 2026
+
+Scale and clock
+The bridge maps one native Melee distance unit to ten SM64 units. Melee runs
+at 60 ticks/second; SM64 runs at 30 world frames/second. A Melee velocity of
+1 therefore corresponds to 20 SM64 units per world frame. A native gravity
+of 0.1 corresponds to 4 SM64 units per world frame squared. The speed option
+changes attributes, never either engine's simulation clock.
+
+Visual calibration checked 3 November 2026: actual skinned standing Melee Mario
+is 148.35 SM64 units tall. Stock Mario is 149.94 in center idle, varying from
+144.03 to 149.98 across 90 idle frames; castle star doors are 256 units high.
+Melee Mario therefore already matches the stock visual scale within ordinary
+pose variation. Melee Link measures 184.85 units (about 25% taller than Melee
+Mario), retaining the native roster proportions. These are visual mesh bounds,
+not Mario's 160-unit collision height. See verification/scale-calibration.json.
+
+Mario's movement attributes, read from the running native engine
+                                      Original Melee     Default 1.25x
+Maximum walking velocity              1.10               1.375
+Initial dash / maximum run            1.50 / 1.50        1.875 / 1.875
+Horizontal aerial drift limit         0.86               1.075
+Horizontal jump limit                 1.50               1.875
+Full-jump vertical launch              2.30               2.30
+Short-hop vertical launch             1.40               1.40
+Jump startup attribute                4 native ticks     4 native ticks
+Gravity                               0.095              0.095
+Normal terminal fall speed            1.70               1.70
+Jumps                                 2                  2
+Weight                                100                100
+Wall-jump ability                     yes                yes
+
+Expressed in SM64 units per 30-Hz world frame:
+- Original Melee Mario walk/run limits: 22 / 30.
+- Default boosted Melee Mario walk/run limits: 27.5 / 37.5.
+- SM64 normal ground target: 32; slow surfaces use 24. SM64 also permits
+  overspeed up to 48 in its walking update, so 48 is not the normal run target.
+- Melee Mario full-jump launch: 46. SM64 normal jump launch: 42 plus 0.25 times
+  forward speed, or about 50 at its normal 32 run target.
+- Melee Mario gravity: 3.8 versus SM64 ordinary gravity 4.
+- Melee Mario ordinary fall limit: 34 versus SM64 ordinary fall limit 75.
+These are limits/initial attributes, not a claim that every input instantly
+reaches them. Analog input, acceleration, slopes and state transitions matter.
+
+State comparison and integration choices
+SM64 idle/walking: Melee Wait, WalkSlow/Middle/Fast, Dash and Run. Melee retains
+its separate dash startup and running state; SM64 instead changes gait within
+its walking action. A partial stick generally walks rather than starting a dash.
+The host now maps SM64's already-processed radius-64 stick to Melee radius1.
+The earlier divisor80 limited full input to0.8 and could suppress dashing.
+Normal keyboard play verified Dash(20), Run(21), RunBrake(23), and an actual
+boosted Mario run speed of 37.5 SM64 units/frame, matching the attribute limit.
+
+SM64 braking/turning: Melee Turn, TurnRun and RunBrake retain native timing;
+Melee3D supplies the world-space heading/collision lane. This is not identical
+to SM64's curved momentum and slope acceleration.
+
+SM64 jump/double/triple jump: Melee KneeBend, JumpF/B and JumpAerialF/B. SM64's
+double/triple jumps are timed ground-jump chains (launch 52 + momentum, then69).
+Melee's second jump happens in the air. Characters retain their own jump count,
+short hops, recovery moves and startup; no synthetic SM64 triple jump is added.
+
+SM64 falling/landing: native Melee Fall and Landing families, including aerial
+attack landing lag and helpless FallSpecial after applicable recoveries.
+Melee Mario falls more slowly than SM64 Mario; increasing horizontal speed
+alone does not change that difference.
+
+SM64 ledge hanging/climbing: native Melee CliffCatch/CliffWait, climbs, rolls,
+attacks and ledge jumps using live SM64 geometry and platform carry.
+
+SM64 wall kicks: native Melee wall jumps for fighters whose native ability
+allows them. A shared movement boost does not grant wall jumps to every fighter.
+
+SM64 doors, painting transitions, cannons and scripted actions: SM64 keeps its
+normal world/script handling. Native simulation pauses for those handoffs.
+
+Why start at 1.25x
+This raises Mario's walking traversal toward SM64's normal target while allowing
+his separate native run to be a little faster. It preserves each character's
+relative speed. It is a configurable playtest choice, not an exact movement
+match or a finding that all characters need the same final tuning.
+
+The existing MELEE3D_NATIVE_MOVE_SPEED setting scales native horizontal movement
+attributes (including acceleration, friction, air drift and ledge/wall-jump
+horizontal launch). It is applied when attributes rebuild from original DAT
+values, so respawns and transformations do not compound the multiplier.
+Attack animation clocks, native vertical jump velocities, gravity, weight and
+the initial damage/knockback formula are not sped up. Character-specific special
+move/root-motion attributes are not all covered by this common speed modifier.
+Use native/play_embedded.py --speed 1 to restore the original movement tuning.
+
+Sources
+Frozen native m3d_native.c and ftCommon motion-state enum under
+work/melee-embedded/abi/src; runtime SMB ATTR logs; SM64 update_walking_speed in
+work/sm64ex-source/src/game/mario_actions_moving.c; set_mario_action_airborne in
+src/game/mario.c; apply_gravity in src/game/mario_step.c.

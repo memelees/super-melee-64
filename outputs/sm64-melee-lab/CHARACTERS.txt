@@ -1,0 +1,59 @@
+Native Melee roster compatibility — 24 October 2026
+
+33/33 selectable characters passed the refreshed Melee3D runtime baseline.
+The run preceded the final sun registration and controller-specific host input
+sampling correction. Focused directional-special/audio/camera and lighting
+checks cover those changes separately; each report retains its build hashes.
+
+Checks: one game process, live SM64 terrain, native character colour/depth,
+native percentage HUD, movement, jumping, active normal attack capsules,
+a neutral-special motion, exact tick synchronization, no startup death,
+120-star save, Melee music muted and character sounds enabled.
+Ice Climbers additionally requires both Popo and Nana to render.
+
+Character       Walk cap     Run cap      Air cap    Native weight
+                (SM64 units per 30-Hz frame, with default 1.25x boost)
+bowser             16.25        37.50        20.00        117.0
+charizard          16.50        47.50        26.25        110.0
+dedede             23.75        37.50        18.00        113.0
+diddy              32.50        44.50        26.25         93.0
+dk                 30.00        40.00        25.00        114.0
+drmario            27.50        37.50        22.50        100.0
+falco              35.00        37.50        20.75         80.0
+falcon             21.25        57.50        28.00        104.0
+fox                40.00        55.00        20.75         75.0
+gamewatch          27.50        37.50        25.00         60.0
+ganondorf          18.25        33.75        19.50        109.0
+iceclimbers        23.75        35.00        17.50         88.0
+jigglypuff         17.50        27.50        33.75         60.0
+kirby              21.25        35.00        19.50         70.0
+link               30.00        32.50        25.00        104.0
+lucas              20.50        37.50        26.25         94.0
+luigi              27.50        33.50        17.00        100.0
+mario              27.50        37.50        21.50        100.0
+marth              40.00        45.00        22.50         87.0
+mewtwo             25.00        35.00        30.00         85.0
+ness               21.00        35.00        23.25         94.0
+peach              21.25        32.50        27.50         90.0
+pichu              31.00        43.00        21.25         55.0
+pikachu            31.00        45.00        21.25         80.0
+roy                30.00        40.25        22.50         85.0
+samus              25.00        35.00        22.25        110.0
+sheik              30.00        45.00        20.00         90.0
+sonic              35.00        62.50        25.62         90.0
+tails              22.50        45.00        24.25         85.0
+wolf               36.25        50.00        21.50         82.0
+yoshi              28.75        40.00        30.00        108.0
+younglink          30.00        40.00        25.00         85.0
+zelda              17.50        27.50        23.75         90.0
+
+These are attribute limits, not an assertion that every analog input instantly
+reaches them. Attacks/recovery root motion can use their own movement values.
+
+Remaining: every directional special, grabs/throws, copy/absorb abilities,
+shield/reflect interactions with world enemies, full partner behavior, every
+boss/mission and native co-op networking. A baseline pass does not certify a
+complete moveset or a complete SM64 playthrough.
+
+See verification/roster.json for per-character checks, build hashes, observed
+motion IDs and native attributes. MOVEMENT-COMPARISON.txt compares Mario states.

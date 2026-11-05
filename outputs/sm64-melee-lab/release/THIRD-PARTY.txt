@@ -1,0 +1,68 @@
+SUPER MELEE 64 — SOURCES, ATTRIBUTION AND DISTRIBUTION BOUNDARIES
+
+This is an unofficial fan modification. It is not affiliated with Nintendo,
+HAL Laboratory, SEGA, or the owners of the depicted characters.
+
+The package includes integration scripts/patches and original branding.
+It does not include original game assets, extracted assets, engine binaries,
+commercial game images, or another player's saves or recordings. Character
+art in previews is generated locally from player-supplied game data and is
+not included in the downloadable source kit.
+
+Bundled source-only build adapter:
+- Super Melee 64 contributors, native fighter adapter
+  Verified bundle super-melee64-adapter-v1
+  SmashRoyale-bootstrap.zip contains the original native adapter/patches and symbol metadata, plus
+  their Python build-tool dependencies, with exact source hashes and notices.
+  It contains no complete engine tree, game assets or binaries. Patches contain
+  changes and context for their pinned upstream inputs; preserve their notices. The adapter
+  sources identify GPL-3.0-or-later; preserve their notices and COPYING-port.txt.
+  Setup uses this bundled source; no private GitHub account/access is required.
+
+Public source dependencies fetched separately at setup:
+- sm64pc, sm64ex
+  https://github.com/sm64pc/sm64ex
+  d7ca2c04364a6dd0dac58b47151e04e26887e6f0
+- 999sian/melee-pc, native Melee engine, and its dependencies
+  https://github.com/999sian/melee-pc
+  0cc24fee6b8e7dd7a9233daa126829d374fe1f40
+- GurekamDhillon/melee, native bridge generator input
+  https://github.com/GurekamDhillon/melee
+  f5662df14c3534652b68bca94e5e0d35e2a24962
+- Akaneia v1.0.1 official patches and walz0 reference patch: URLs and
+  checksums are pinned by Smash Royale's prepare_native_inputs.py.
+- SDL2, SDL3, GLEW, Dawn, Nod, libffi and other native dependencies:
+  preserve the notices/licenses fetched with their source and runtime files.
+
+Important source notice
+The melee-pc licenses/LICENSE.md distinguishes its GPL-3.0-or-later port
+code from its unlicensed Nintendo/HAL decompiled game code. Its notice says
+that permission to redistribute the latter is not offered. Supplying a disc
+at setup does not turn that notice into a binary redistribution license.
+That is why this kit fetches upstream separately and builds only on the
+player's machine; no complete native engine binary is shipped here.
+
+COPYING-port.txt preserves the upstream GPL text for applicable port work.
+UPSTREAM-LICENSING.txt preserves the exact upstream licensing explanation.
+Those files do not relicense game code/assets or grant rights on behalf of
+their owners. The integration's existing notices remain applicable; no blanket
+license for Nintendo/HAL/SEGA assets or decompiled code is claimed.
+
+The Super Melee 64 logo is newly rendered artwork inspired by the games,
+packaged into transparent icons by native/build_branding.py. It does not
+include extracted Nintendo logo meshes or commercial font files. The runtime title scene is extracted locally from
+the player's SM64 ROM. The game uses original title geometry/backgrounds
+locally; those assets are not in the release kit.
+
+The beta records its tested setup and runtime scope in the release notes.
+Windows remains experimental; source/patch provenance and upstream notices
+do not amount to a blanket licence for the combined game engine.
+
+Multiplayer host: Coop Deluxe, https://github.com/coop-deluxe/sm64coopdx
+Pinned revision: 8cd6e5977d9f920d51ca71f2c61801d019ed79c6
+Coopnet and libjuice are fetched with that dependency; preserve their notices.
+
+Windows co-op builds Lua 5.3.5 from its official source (MIT).
+https://www.lua.org/ftp/lua-5.3.5.tar.gz
+SHA256 0c2eed3f960446e1a3e4b9a1ca2f3ff893b6ce41942cf54d5dd59ab4b3b058ac
+The upstream COPYRIGHT/README notice remains in the downloaded source tree.
