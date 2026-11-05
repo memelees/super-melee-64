@@ -1,0 +1,121 @@
+name: Source checks (no game files)
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      GIT_TERMINAL_PROMPT: "0"
+    steps:
+      - name: Check out the complete public source history
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check Python syntax without importing build tools
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+          for name in subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0'):
+              if name.endswith('.py'):
+                  compile(Path(name).read_bytes(), name, 'exec')
+          PY
+      - name: Install small C-test prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends clang zlib1g-dev
+      - name: Audit source, assets, credential formats and Git history
+        run: |
+          python3 outputs/sm64-melee-lab/native/verify_repository.py --self-test
+          python3 outputs/sm64-melee-lab/native/export_public_source.py --self-test
+          python3 outputs/sm64-melee-lab/native/verify_repository.py
+          python3 outputs/sm64-melee-lab/native/verify_bootstrap.py
+      - name: Verify actual round/input code and campaign ownership
+        run: |
+          python3 outputs/sm64-melee-lab/native/verify_rounds.py
+          python3 outputs/sm64-melee-lab/native/verify_npc_placement.py
+          python3 outputs/sm64-melee-lab/native/verify_coop_campaign.py
+          python3 outputs/sm64-melee-lab/native/verify_release.py --campaign-only
+      - name: Get the pinned public SM64 source for the air reference
+        run: |
+          git init "$RUNNER_TEMP/sm64-stock"
+          git -C "$RUNNER_TEMP/sm64-stock" remote add origin https://github.com/sm64pc/sm64ex.git
+          git -C "$RUNNER_TEMP/sm64-stock" fetch --depth 1 origin d7ca2c04364a6dd0dac58b47151e04e26887e6f0
+          git -C "$RUNNER_TEMP/sm64-stock" checkout --detach FETCH_HEAD
+      - name: Compare air rules against the unmodified stock routine
+        run: python3 outputs/sm64-melee-lab/native/verify_air.py --stock-source "$RUNNER_TEMP/sm64-stock"
+      - name: Get the pinned public co-op source for packet safety checks
+        run: |
+          git init "$RUNNER_TEMP/coop-stock"
+          git -C "$RUNNER_TEMP/coop-stock" remote add origin https://github.com/coop-deluxe/sm64coopdx.git
+          git -C "$RUNNER_TEMP/coop-stock" fetch --depth 1 origin 8cd6e5977d9f920d51ca71f2c61801d019ed79c6
+          git -C "$RUNNER_TEMP/coop-stock" checkout --detach FETCH_HEAD
+      - name: Verify packet routines with address and undefined behavior sanitizers
+        run: python3 outputs/sm64-melee-lab/native/verify_network_safety.py --source "$RUNNER_TEMP/coop-stock"
+
+  windows-installer-source:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Check out source without build credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Use Python 3.12 for installer unit tests
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - name: Test installer support without game files
+        run: python outputs/sm64-melee-lab/release/installer_tests.py
+      - name: Test real Windows installer quoting and input headers
+        shell: pwsh
+        run: ./outputs/sm64-melee-lab/release/installer_tests.ps1
+      - name: Test the stock Windows PowerShell installer host
+        shell: powershell
+        run: ./outputs/sm64-melee-lab/release/installer_tests.ps1
+      - name: Parse PowerShell installer source without executing setup
+        shell: pwsh
+        run: |
+          $files = git ls-files -- '*.ps1'
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $env:GITHUB_WORKSPACE $file), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error $_.Message }
+              throw "PowerShell syntax validation failed."
+            }
+          }
+      - name: Compile and execute the actual native launcher self-test
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $installation = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (!$installation) { throw "The Windows runner lacks Visual C++ build tools." }
+          $source = Join-Path $env:GITHUB_WORKSPACE 'outputs\sm64-melee-lab\release\WindowsLauncher.cpp'
+          $launcher = Join-Path $env:RUNNER_TEMP 'SuperMelee64Launcher.exe'
+          $batch = Join-Path $env:RUNNER_TEMP 'compile-launcher.cmd'
+          @"
+          @echo off
+          call "$installation\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64
+          if errorlevel 1 exit /b 1
+          cd /d "$env:RUNNER_TEMP"
+          cl /nologo /utf-8 /std:c++17 /EHsc /O2 /MT /DUNICODE /D_UNICODE "$source" /Fe:"$launcher" shell32.lib ole32.lib uuid.lib /link /SUBSYSTEM:WINDOWS
+          exit /b %ERRORLEVEL%
+          "@ | Set-Content -Path $batch -Encoding ascii
+          & cmd.exe /c $batch
+          if ($LASTEXITCODE -ne 0) { throw "Native launcher compilation failed." }
+          $test = Start-Process -FilePath $launcher -ArgumentList '--self-test' -Wait -PassThru
+          if ($test.ExitCode -ne 0) { throw "Native launcher self-test failed." }
