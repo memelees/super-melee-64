@@ -4,6 +4,13 @@ Super Melee 64 combines the SM64 adventure with native Melee fighters. Keep the
 SM64 and Smash Royale integrations independently buildable, and avoid changing
 another local checkout to make this project run.
 
+Forks and downstream integrations are welcome; contributing upstream is
+optional. Start with [the integration tour](docs/INTEGRATION.md), then use
+[the porting guide](docs/PORTING.md) if you want another game to host the
+fighters. The original project code is GPL-3.0-or-later. You can make private
+changes without publishing them, and distribute covered changes under the
+licence's source and notice requirements. See [LICENSING.md](LICENSING.md).
+
 Before submitting changes, read [LICENSING.md](LICENSING.md). Submit only work
 you have the right to contribute under the applicable project license. Preserve
 existing notices and identify the source, revision and license of third-party

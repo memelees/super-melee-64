@@ -75,6 +75,20 @@ behaviour, public-peer security, or sixteen-player performance. See
 
 ## Build and contribute
 
+Forks, modifications and experiments are welcome. The original integration is
+**GPL-3.0-or-later**: you can change and reuse it without asking us, including
+in another game integration. Distributed covered versions must preserve the
+GPL's source and licence freedoms; private changes do not have to be published.
+See [your rights and the third-party scope](LICENSING.md).
+
+Developer guides:
+
+- [How the integration works](docs/INTEGRATION.md): the engine boundary,
+  simulation, collision, input, rendering, audio and multiplayer ownership.
+- [Adapting it to another game](docs/PORTING.md): a staged implementation path,
+  the host responsibilities and validation needed for a new integration.
+- [Contributing](CONTRIBUTING.md): local setup, checks and change submission.
+
 ```sh
 git clone https://github.com/memelees/super-melee-64.git
 cd super-melee-64

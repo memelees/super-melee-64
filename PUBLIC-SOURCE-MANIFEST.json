@@ -10,12 +10,14 @@
     ".github/ISSUE_TEMPLATE/bug_report.md": "ba0e39673e391f42372fe9b02b329b2195795c3450b8df0c1ae9a935130a6403",
     ".github/workflows/source-checks.yml": "1a5a103538ec702397f61bafc232a55e42f5de39e5d8323a5657e03f37a92614",
     ".gitignore": "46843b8aaba50b960e3962f392cf74a356df58d4e9acd8c8a60a4330b389729e",
-    "CONTRIBUTING.md": "9933a63b8dbbeb6fefefca33f1eea9bd6b9522e80b4b60106ec1f5c193a7ce70",
+    "CONTRIBUTING.md": "fe17bc1f667a4ab98c783c062695bffd02606762faab70dbf5162aa800a63ef5",
     "LICENSE": "0fc2e6daa278cd8dd8bf5740c9466f80961dd7d0527f24593abfd61e2cd743c7",
-    "LICENSING.md": "5273d39dbbf4f551fc0e93652d57b9a9feb351bd208646861fece33a6338b3ba",
-    "README.md": "5fe81cea48dbf15ab9a2950fe91b9bcb55ec164f0b242bd06cab064a10da7aa1",
+    "LICENSING.md": "24e3c1ad61c3eabf24ada610b162666eb1d355d1f73ebd171b271f994ed375a9",
+    "README.md": "186473c8489c2ec3d3b59d452f1ef1b48e404f077ef5abac6da3ee227b0a5ec0",
     "SECURITY.md": "87e56d5df8f982eba13ea864bcb7b60bb9f86da8d0242ff3ba995e653eadb9a8",
     "docs/BOOTSTRAP-PROVENANCE.md": "cb060d7ffc949f6f400c3bbe9abae1bd6aed30b6948d1dc8893a5cfe6894e738",
+    "docs/INTEGRATION.md": "41aa99bed76bc2003b5993ab78ab1e80006ab5cbe362a9c3b98ff6327e330494",
+    "docs/PORTING.md": "d2ff443b37595d993ff928561319a60bc47931b186c19e2caa0660390dfe45ae",
     "outputs/sm64-melee-lab/CHARACTERS.txt": "6cfa9d6531be662be8158b560c0aaac05c7af6108ef0752e1928853d4f27b337",
     "outputs/sm64-melee-lab/MOVEMENT-COMPARISON.txt": "0f9ad786148b15a70fd2d8438678d66478b87631086169a166dfde87d2fdf25c",
     "outputs/sm64-melee-lab/REQUIREMENTS.txt": "5049faacd3642cd7f6cf5c5de56a35b1d61c65ea79e647b20c4a0b88c4c79011",
@@ -162,6 +164,6 @@
     "outputs/sm64-melee-lab/release/prepare_installer_inputs.py": "c1ddb0a01335ff5452f9503c411a02947aa6a46224eac29f310b47858873dc6c",
     "outputs/sm64-melee-lab/release/setup_support.py": "dc9b7bc88bbeead4a7939b2c613ea016e12f0a6591e0d71cf25397afb4289903",
     "outputs/sm64-melee-lab/verification/beta-acceptance.json": "352bed5fd285de05f7f8ef50e6b7e2b44ad47647f51d48aae265f44e3d12e961",
-    "outputs/sm64-melee-lab/verification/public-source-audit.json": "b44d1a0dfbbeb5a19621f61eaedd69ff5e487b43dd96c41cf8456484fc547f5f"
+    "outputs/sm64-melee-lab/verification/public-source-audit.json": "553427dabdc8a14a5946154e86f4ec03ff1012ebc326874084fd6e54f1741fc3"
   }
 }

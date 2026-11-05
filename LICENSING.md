@@ -8,6 +8,30 @@ licensed under **GPL-3.0-or-later**, unless a file carries a different notice.
 The full GNU General Public License version 3 is in [LICENSE](LICENSE).
 You may use version 3 or, at your option, any later version.
 
+## Your freedom to change and reuse the project
+
+You are welcome to fork this project, edit its original code, add characters or
+features, experiment privately, and adapt the integration to other games.
+You do not need separate permission from this project, and you do not have to
+send your changes back here. Commercial use of the covered original work is
+also permitted under the GPL's terms.
+
+If you distribute covered code or a modified version, preserve the applicable
+copyright and licence notices, identify your changes, and meet the GPL's
+corresponding-source and licensing requirements. Recipients must retain the
+freedom to study, modify and redistribute the covered work. Private changes do
+not have to be published. This is free software with copyleft terms; it is not
+a waiver of all conditions. The full [LICENSE](LICENSE) is authoritative; see
+the GNU project's [GPL FAQ](https://www.gnu.org/licenses/gpl-faq.en.html) for
+explanations of private changes and distributing modified versions.
+
+Start with [how the integration works](docs/INTEGRATION.md) and the
+[guide to adapting it to another game](docs/PORTING.md). Reusing the technique
+does not grant rights over a game's code or assets: the scope below still
+applies to each dependency and to any new host or donor game.
+
+## What the licence covers
+
 This grant covers only the contributors' original work. It does not relicense
 third-party code, patch context, game assets, character designs, trademarks or
 other material belonging to their respective owners. Where a file combines
