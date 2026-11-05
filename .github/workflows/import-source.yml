@@ -245,6 +245,33 @@ jobs:
               return subprocess.check_output(list(args), **kwargs)
 
 
+          def check_existing(root, tracked, new_files):
+              """Allow an intact audited source tree; preserve all browser-authored workflows."""
+              previous = root/MANIFEST
+              if not previous.exists():
+                  starter = {'README.md','LICENSE','.gitignore'}
+                  require(all(name in starter or name.startswith('.github/workflows/') for name in tracked), 'Refusing an unknown starter tree')
+                  return
+              require(previous.is_file() and not previous.is_symlink(), 'Invalid prior source manifest')
+              info = parse_json(previous.read_bytes())
+              require(info.get('format') == 1 and info.get('source_only') is True and
+                      info.get('git_history_included') is False and
+                      info.get('private_source_commit_metadata_included') is False, 'Prior source manifest is not an audited export')
+              hashes = info.get('files')
+              require(isinstance(hashes, dict), 'Invalid prior source member map')
+              require(set(hashes) <= set(new_files), 'Source update may not silently remove prior members')
+              require(all(name == MANIFEST or name in hashes or name.startswith('.github/workflows/') for name in tracked), 'Unexpected tracked source outside prior manifest')
+              for name, digest in hashes.items():
+                  require(allowed_source(name) and isinstance(digest, str) and SHA.fullmatch(digest), 'Invalid prior source member')
+                  # Workflow changes require the owner to use the browser, and are never
+                  # staged or overwritten by this importer. Other files must be unchanged.
+                  if name.startswith('.github/workflows/'):
+                      continue
+                  target = root/name
+                  require(target.is_file() and not target.is_symlink() and
+                          hashlib.sha256(target.read_bytes()).hexdigest() == digest, 'Prior source was modified outside its audited manifest')
+
+
           def main():
               require(os.environ.get('GITHUB_REPOSITORY') == 'memelees/super-melee-64' and
                       os.environ.get('GITHUB_ACTOR') == 'memelees' and
@@ -282,8 +309,7 @@ jobs:
               root = Path(os.environ['GITHUB_WORKSPACE']).resolve()
               require(command('git','status','--porcelain=v1','--untracked-files=all',cwd=root) == b'', 'Starter repository must be clean')
               tracked = command('git','ls-files','-z',cwd=root).decode().split('\0')[:-1]
-              starter = {'README.md','LICENSE','.gitignore'}
-              require(all(name in starter or name.startswith('.github/workflows/') for name in tracked), 'Refusing to overwrite a repository that already contains source')
+              check_existing(root, tracked, files)
               skipped = [];imported = []
               for name, (payload, mode) in sorted(files.items()):
                   if name.startswith('.github/workflows/'):
