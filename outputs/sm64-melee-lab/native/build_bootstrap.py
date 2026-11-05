@@ -36,7 +36,7 @@ def configure_local_sources(destination):
         for before,after in replacements:
             if before not in source and after not in source:raise RuntimeError('Unexpected installer source configuration: '+name)
             source=source.replace(before,after)
-        if source!=original:path.write_text(source)
+        if source!=original:path.write_text(source,encoding='utf-8',newline='\n')
 
 
 def sha(data):return hashlib.sha256(data).hexdigest()

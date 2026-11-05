@@ -174,7 +174,7 @@ class InstallerTests(unittest.TestCase):
     def test_mac_preflight_failure_has_no_downloads_and_saves_gui_diagnostic(self):
         # Exercise the real main ordering without game images or external tools.
         failure=mac.compiler_problem('fatal error: sys/types.h: No such file or directory','gcc-16')
-        with mock.patch.object(setup,'ROOT',self.root),mock.patch.object(sys,'argv',['Setup.py','--rom','fixture.z64','--melee','fixture.iso']), \
+        with mock.patch.object(setup,'ROOT',self.root),mock.patch.object(sys,'argv',['Setup.py','--platform','mac','--rom','fixture.z64','--melee','fixture.iso']), \
              mock.patch.object(setup,'verify_inputs',return_value={}),mock.patch.object(setup,'preflight',return_value=[]), \
              mock.patch.object(setup,'verify_bootstrap',return_value={'revision':'fixture','files':{}}),mock.patch.object(setup,'digest',return_value='fixture'), \
              mock.patch.object(setup,'require_filesystem'),mock.patch.object(setup.sys,'platform','darwin'), \

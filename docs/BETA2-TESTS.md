@@ -57,3 +57,8 @@ required exactly 1.25x camera distance. It now accepts the existing bounded
 
 [Previous beta acceptance](../outputs/sm64-melee-lab/verification/beta-acceptance.json)
 records the broader stage, roster, integration and network baseline.
+
+Windows CI also caught a Mac test that relied on the host's default target and
+adapter overrides that changed LF files to CRLF on Windows. The test now
+selects Mac explicitly, and configuration writes UTF-8 with LF line endings so
+the original pinned-byte verification remains valid on resume.
