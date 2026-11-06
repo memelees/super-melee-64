@@ -21,5 +21,17 @@ try {
     $nested=Join-Path $temporary 'outputs/sm64-melee-lab/native';[void][IO.Directory]::CreateDirectory($nested)
     [IO.File]::WriteAllText((Join-Path $nested 'bridge_protocol.h'),'asset-free fixture')
     if ((Get-SuperMeleeRoot $nested) -ne $temporary) { throw 'Source-kit root detection failed.' }
+    $diagnostic=New-SetupDiagnostic 'Finish Ubuntu initialization and any Windows restart'
+    if ($diagnostic.code -ne 'windows-wsl' -or $diagnostic.recovery -notmatch 'Start menu') { throw 'WSL repair instructions missing.' }
+    $diagnostic=New-SetupDiagnostic 'Install the Microsoft Visual C++ x64 runtime'
+    if ($diagnostic.code -ne 'windows-runtime' -or $diagnostic.recovery -notmatch 'Prepare Build Tools') { throw 'Runtime repair instructions missing.' }
+    $work=Join-Path $temporary 'work';[void][IO.Directory]::CreateDirectory($work)
+    $diagnostic | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $work 'setup-error.json') -Encoding UTF8
+    if ((Get-SetupDiagnostic $temporary).code -ne 'windows-runtime') { throw 'Saved diagnostic was not read.' }
+    [IO.File]::WriteAllText((Join-Path $temporary 'setup.log'),'old backend failure')
+    [IO.File]::WriteAllText((Join-Path $temporary 'setup-events.log'),'new preparation failure')
+    if ((Get-SetupLogPath $temporary) -ne (Join-Path $temporary 'setup-events.log')) { throw 'The log button selected a stale backend log.' }
+    [IO.File]::WriteAllText((Join-Path $work 'setup-error.json'),'invalid json')
+    if ($null -ne (Get-SetupDiagnostic $temporary)) { throw 'Invalid diagnostic JSON accepted.' }
 } finally { Remove-Item -LiteralPath $temporary -Recurse -Force }
-@{passed=$true;parsing=$results;argument_cases=$cases.Count;game_headers=3;root_detection=$true;tools_installed=$false;games_started=$false}|ConvertTo-Json -Depth 5
+@{passed=$true;parsing=$results;argument_cases=$cases.Count;game_headers=3;root_detection=$true;failure_diagnostics=$true;current_log_selected=$true;tools_installed=$false;games_started=$false}|ConvertTo-Json -Depth 5

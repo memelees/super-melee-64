@@ -3,7 +3,8 @@ Add-Type -AssemblyName System.Drawing
 . (Join-Path $PSScriptRoot 'installer_windows_support.ps1')
 $gameRoot=Get-SuperMeleeRoot $PSScriptRoot
 $form=New-Object Windows.Forms.Form
-$form.Text='Install Super Melee 64 (Windows experimental)'; $form.Size=New-Object Drawing.Size(740,630)
+$installerVersion=(Select-String -LiteralPath (Join-Path $gameRoot 'outputs/sm64-melee-lab/native/package_release.py') -Pattern "^VERSION='([^']+)'" | Select-Object -First 1).Matches.Groups[1].Value
+$form.Text="Install Super Melee 64 - $installerVersion (Windows experimental)"; $form.Size=New-Object Drawing.Size(740,630)
 $form.AllowDrop=$true; $form.StartPosition='CenterScreen'
 $label=New-Object Windows.Forms.Label
 $label.Text="Drop your original SM64 US ROM and Melee USA Rev 2 disc here.`r`nSetup builds locally; game files are never uploaded. Allow 12 GiB free; 20 GiB is recommended."
@@ -34,6 +35,8 @@ function Start-Setup($prepare) {
     $arguments=@('-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',"$PSScriptRoot\SetupWindows.ps1")
     if ($prepare) { $arguments+='-PrepareTools'; $script:mode='tools' } else { $arguments+=@('-Rom',$script:rom,'-Melee',$script:melee); $script:mode='build' }
     try {
+        $diagnosticPath=Join-Path $gameRoot 'work/setup-error.json'
+        if (Test-Path -LiteralPath $diagnosticPath) { Remove-Item -LiteralPath $diagnosticPath }
         $script:buildProcess=Start-Process powershell.exe -PassThru -ArgumentList (($arguments | ForEach-Object { ConvertTo-WindowsArgument $_ }) -join ' ')
         $build.Enabled=$false; $tools.Enabled=$false; $cancel.Enabled=!$prepare; $timer.Start()
         $log.AppendText("Setup opened in its own progress window. Prepare Build Tools may show Windows permission prompts. Inputs stay local.`r`n")
@@ -50,18 +53,27 @@ $form.Add_DragEnter({ if ($_.Data.GetDataPresent([Windows.Forms.DataFormats]::Fi
 $form.Add_DragDrop({ Accept-GameFiles $_.Data.GetData([Windows.Forms.DataFormats]::FileDrop) })
 $choose.Add_Click({ $picker=New-Object Windows.Forms.OpenFileDialog; $picker.Multiselect=$true; $picker.Filter='Game images|*.z64;*.iso;*.gcm|All files|*.*'; try { if ($picker.ShowDialog() -eq 'OK') { Accept-GameFiles $picker.FileNames } } finally { $picker.Dispose() } })
 $build.Add_Click({ Start-Setup $false }); $tools.Add_Click({ Start-Setup $true }); $cancel.Add_Click({ Cancel-Setup })
-$open.Add_Click({ if (Test-Path "$gameRoot\setup.log") { Start-Process notepad.exe -ArgumentList (ConvertTo-WindowsArgument "$gameRoot\setup.log") } else { Start-Process explorer.exe -ArgumentList (ConvertTo-WindowsArgument $gameRoot) } })
+$open.Add_Click({ $path=Get-SetupLogPath $gameRoot; if ($path) { Start-Process notepad.exe -ArgumentList (ConvertTo-WindowsArgument $path) } else { Start-Process explorer.exe -ArgumentList (ConvertTo-WindowsArgument $gameRoot) } })
 $timer=New-Object Windows.Forms.Timer; $timer.Interval=750
 $timer.Add_Tick({
-    if (Test-Path "$gameRoot\setup.log") {
-        $tail=(Get-Content -LiteralPath "$gameRoot\setup.log" -Tail 10 -ErrorAction SilentlyContinue) -join "`r`n"
+    $path=Get-SetupLogPath $gameRoot
+    if ($path) {
+        $tail=(Get-Content -LiteralPath $path -Tail 10 -ErrorAction SilentlyContinue) -join "`r`n"
         if ($tail -ne $script:lastTail) { $log.AppendText($tail+"`r`n"); $script:lastTail=$tail }
     }
     $script:buildProcess.Refresh()
     if ($script:buildProcess.HasExited) {
         $script:buildProcess.WaitForExit(); $code=$script:buildProcess.ExitCode; $timer.Stop(); $script:buildProcess=$null
         $tools.Enabled=$true; $cancel.Enabled=$false; Accept-GameFiles @()
-        $log.AppendText("Setup process finished (exit $code). Build / Resume retries using verified caches. See setup.log or setup-events.log for details.`r`n")
+        if ($code -eq 0) { $log.AppendText("Setup finished successfully. Open Super Melee 64 to play, or choose Build / Resume after preparing tools.`r`n") }
+        elseif ($code -eq 130) { $log.AppendText("Stopped safely. Choose Build / Resume to continue using verified caches.`r`n") }
+        else {
+            $diagnostic=Get-SetupDiagnostic $gameRoot
+            if (!$diagnostic) { $diagnostic=New-SetupDiagnostic "The setup process stopped with exit code $code. Open Setup Log for the complete output." }
+            $details=Format-SetupDiagnostic $diagnostic
+            $log.AppendText($details+"`r`n")
+            [void][Windows.Forms.MessageBox]::Show($form,$details,$diagnostic.title,'OK','Warning')
+        }
     }
 })
 $form.Add_FormClosing({ if ($null -ne $script:buildProcess) { $_.Cancel=$true; Cancel-Setup } })

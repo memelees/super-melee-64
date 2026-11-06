@@ -132,14 +132,17 @@ class Session:
         if 'shell' in kw:raise ValueError('Installer commands must use explicit argument lists')
         process=subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
             text=True,errors='replace',start_new_session=os.name!='nt',**kw);self.child=process
+        recent=['']
         def stream():
-            for line in process.stdout:print(line,end='',flush=True)
+            for line in process.stdout:
+                recent[0]=(recent[0]+line)[-16000:]
+                print(line,end='',flush=True)
         reader=threading.Thread(target=stream,daemon=True);reader.start()
         try:
             while process.poll() is None:
                 self.check_cancel();time.sleep(.15)
             reader.join(timeout=3)
-            if process.returncode:raise subprocess.CalledProcessError(process.returncode,command)
+            if process.returncode:raise subprocess.CalledProcessError(process.returncode,command,output=recent[0])
         except BaseException:
             if process.poll() is None:
                 try:

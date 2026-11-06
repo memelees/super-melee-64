@@ -7,6 +7,10 @@ $root=Get-SuperMeleeRoot $scripts
 if ($LinuxDistro -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') { throw 'Invalid Linux distribution name.' }
 Start-Transcript -Path (Join-Path $root 'setup-events.log') -Append | Out-Null
 try {
+    $diagnosticPath=Join-Path $root 'work/setup-error.json'
+    if (Test-Path -LiteralPath $diagnosticPath) { Remove-Item -LiteralPath $diagnosticPath }
+    $version=(Select-String -LiteralPath (Join-Path $root 'outputs/sm64-melee-lab/native/package_release.py') -Pattern "^VERSION='([^']+)'" | Select-Object -First 1).Matches.Groups[1].Value
+    Write-Host "SUPER MELEE 64 INSTALLER $version - $([DateTimeOffset]::Now.ToString('o'))"
     if ($PrepareTools) {
         Write-Host 'Preparing the Microsoft runtime and Ubuntu build tools. Windows may request permission or a restart.'
         $vc = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64' -ErrorAction SilentlyContinue
@@ -55,9 +59,20 @@ try {
     if (Test-Path -LiteralPath $cancelFile) { Remove-Item -LiteralPath $cancelFile }
     $linuxSetup=Linux-Path (Join-Path $scripts 'Setup.py')
     & wsl.exe --distribution $LinuxDistro --exec python3 $linuxSetup --platform windows --rom $linuxRom --melee $linuxMelee --cancel-file "$linuxRoot/work/setup.cancel" 2>&1 | Tee-Object -FilePath "$root/setup-console.log"
+    if ($LASTEXITCODE -eq 130) { exit 130 }
     if ($LASTEXITCODE -ne 0) { throw 'Setup stopped. See setup.log. Build / Resume keeps verified downloads and compiler outputs.' }
     $shortcuts=New-Object -ComObject WScript.Shell; $link=$shortcuts.CreateShortcut("$root\Super Melee 64.lnk")
     $link.TargetPath="$root\Super Melee 64.exe"; $link.WorkingDirectory=$root
     $link.IconLocation="$root\outputs\sm64-melee-lab\branding\Super Melee 64.ico"; $link.Save()
     Write-Host 'Ready. Open Super Melee 64.lnk. Gameplay no longer needs Python or WSL.'
-} catch { Write-Error $_; exit 1 } finally { Stop-Transcript | Out-Null }
+} catch {
+    $diagnostic=Get-SetupDiagnostic $root
+    if (!$diagnostic) { $diagnostic=New-SetupDiagnostic $_.Exception.Message }
+    if (!$diagnostic.version) { $diagnostic | Add-Member -NotePropertyName version -NotePropertyValue $version -Force }
+    try {
+        [void][IO.Directory]::CreateDirectory((Join-Path $root 'work'))
+        $diagnostic | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $root 'work/setup-error.json') -Encoding UTF8
+    } catch { } # A full or read-only disk must not hide the original explanation.
+    Write-Host (Format-SetupDiagnostic $diagnostic)
+    exit 1
+} finally { Stop-Transcript | Out-Null }

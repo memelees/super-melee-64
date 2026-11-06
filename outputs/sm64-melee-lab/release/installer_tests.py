@@ -7,6 +7,8 @@ import setup_support as support
 import Setup as setup
 import prepare_installer_inputs as inputs
 import mac_toolchain as mac
+import build_host
+from setup_diagnostics import diagnose,format_diagnostic
 
 class InstallerTests(unittest.TestCase):
     def setUp(self):
@@ -18,6 +20,40 @@ class InstallerTests(unittest.TestCase):
     def test_public_adapter_is_bundled(self):
         self.assertEqual(setup.PINS['smash-royale'],('bundled-source-bootstrap',setup.ADAPTER_PIN))
         self.assertFalse(setup.ADAPTER_PIN.startswith('http'))
+    def test_mac_host_rejects_apple_make_before_build(self):
+        with mock.patch.object(build_host.sys,'platform','darwin'),mock.patch.object(build_host.shutil,'which',side_effect=lambda name: '/usr/bin/make' if name=='make' else None):
+            with self.assertRaisesRegex(RuntimeError,'brew install make'):build_host.make_program()
+    def test_mac_host_prefers_gnu_make(self):
+        with mock.patch.object(build_host.sys,'platform','darwin'),mock.patch.object(build_host.shutil,'which',side_effect=lambda name: '/opt/homebrew/bin/gmake' if name=='gmake' else '/usr/bin/make'):
+            self.assertEqual(build_host.make_program(),'/opt/homebrew/bin/gmake')
+    def test_mac_prerequisites_require_gmake_even_when_apple_make_exists(self):
+        with mock.patch.object(setup.shutil,'which',side_effect=lambda name: None if name=='gmake' else '/fixture/'+name),mock.patch.object(setup,'mac_gcc',return_value='/fixture/gcc'),mock.patch.object(setup.importlib.util,'find_spec',return_value=True):
+            self.assertIn('gmake',setup.preflight('mac'))
+    @unittest.skipUnless(os.name!='nt' and (shutil.which('gmake') or shutil.which('make')),'POSIX make fixture requires Mac or Linux')
+    def test_host_build_generates_early_make_include_from_empty_directory(self):
+        source=self.root/'work/sm64ex-source';source.mkdir(parents=True)
+        # Like the pinned host's Makefile.split: its generated include is needed
+        # before make reaches the later directory-creation step.
+        (source/'Makefile').write_text('all: $(BUILD_DIR)/complete\n'
+            '$(BUILD_DIR)/level_rules.mk:\n\tprintf "READY := yes\\n" > $@\n'
+            'include $(BUILD_DIR)/level_rules.mk\n'
+            '$(BUILD_DIR)/complete:\n\ttest "$(READY)" = yes\n\ttouch $@\n')
+        with mock.patch.object(build_host,'ROOT',self.root),mock.patch.dict(os.environ,{'SMB_BUILD_TARGET':'mac'}):
+            build_host.build()
+            output=source/'build/us_melee_bridge'
+            self.assertTrue((output/'complete').is_file())
+            marker=output/'keep-existing-output';marker.write_text('preserve')
+            build_host.build()
+            self.assertEqual(marker.read_text(),'preserve')
+    def test_windows_host_build_creates_separate_output_before_dependencies(self):
+        source=self.root/'work/sm64ex-source';source.mkdir(parents=True)
+        sentinel=source/'build/us_melee_bridge/keep';sentinel.parent.mkdir(parents=True);sentinel.write_text('mac output')
+        def dependencies():
+            self.assertTrue((source/'build/us_melee_bridge_windows').is_dir())
+            self.assertEqual(sentinel.read_text(),'mac output')
+            raise RuntimeError('fixture: stop before downloads')
+        with mock.patch.object(build_host,'ROOT',self.root),mock.patch.dict(os.environ,{'SMB_BUILD_TARGET':'windows'}),mock.patch.object(build_host,'make_program',return_value='fixture-make'),mock.patch.object(build_host,'prepare_windows',side_effect=dependencies):
+            with self.assertRaisesRegex(RuntimeError,'fixture: stop before downloads'):build_host.build()
     def test_bootstrap_integrity(self):
         manifest=setup.verify_bootstrap(setup.BOOTSTRAP)
         self.assertTrue(manifest['source_only']);self.assertEqual(manifest['revision'],setup.ADAPTER_PIN)
@@ -30,6 +66,55 @@ class InstallerTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError,'not writable'):support.require_filesystem(self.root)
         with mock.patch.object(support,'filesystem_report',return_value=dict(report,enough_space=False,path_has_spaces=False,writable=True)):
             with self.assertRaisesRegex(RuntimeError,'available'):support.require_filesystem(self.root)
+    def test_diagnostic_repair_cases(self):
+        cases=[
+            ('Setup needs at least 12.0 GiB free in the build folder; 8.3 GiB is available.','disk-space','3.7 GiB'),
+            ('cc1: fatal error: opening output file build/us_melee_bridge/level_rules.mk: No such file or directory','gnu-make','brew install make'),
+            ('Install the prerequisites in START HERE.txt: gmake','gnu-make','Prepare Build Tools'),
+            ('SM64: use the original US big-endian .z64 ROM (8 MiB).','sm64-image','.z64'),
+            ('Melee: use an unmodified USA Rev 2 GameCube disc image','melee-image','USA Rev 2'),
+            ('Choose a build folder without spaces','build-path','Build Folder'),
+            ('The build folder is not writable','folder-access','owned by your account'),
+            ('No space left on device','disk-full','20 GiB'),
+            ('The Mac target currently requires Apple Silicon and macOS 15+.','mac-platform','Intel'),
+            ('Setup is already running for this build folder','setup-running','Cancel'),
+            ('SSL certificate problem','download-certificate','Keep certificate verification enabled'),
+            ('curl: (6) Could not resolve host','download-network','connection'),
+            ('Preserving a different existing local input','existing-files','empty build folder'),
+            ('Dependency checksum mismatch','download-integrity','do not disable'),
+            ('The complete source kit is missing','incomplete-kit','Extract'),
+            ('Unrecognised failure','setup-failed','Open Setup Log')]
+        for message,code,repair in cases:
+            with self.subTest(code=code,message=message):
+                value=diagnose(RuntimeError(message),version='fixture')
+                self.assertEqual(value['code'],code);self.assertIn(repair,value['recovery'])
+                self.assertIn('Error code: '+code,format_diagnostic(value));self.assertEqual(value['version'],'fixture')
+    def test_child_error_retains_only_current_bounded_output(self):
+        with self.assertRaises(subprocess.CalledProcessError) as raised:
+            with self.session() as session:
+                session.run([sys.executable,'-c','print("old sys/types.h: No such file")'])
+                session.run([sys.executable,'-c','print("x"*20000); print("curl: (6) Could not resolve host"); raise SystemExit(7)'])
+        self.assertLessEqual(len(raised.exception.output),16000)
+        self.assertNotIn('sys/types.h',raised.exception.output)
+        stage=dict(number=3,total=12,label='Compile native engine')
+        value=diagnose(raised.exception,stage=stage)
+        self.assertEqual(value['code'],'download-network');self.assertEqual(value['stage'],stage)
+        self.assertIn('step 3/12',value['message'])
+    def test_early_failure_is_saved_before_backend_log_opens(self):
+        error=RuntimeError('Setup needs at least 12.0 GiB free in the build folder; 8.3 GiB is available.')
+        with mock.patch.object(setup,'ROOT',self.root),mock.patch.object(setup,'main',side_effect=error),mock.patch.object(setup,'CURRENT_STAGE',None),mock.patch.object(sys,'argv',['Setup.py']),contextlib.redirect_stderr(io.StringIO()) as output:
+            self.assertEqual(setup.entrypoint(),1)
+        value=json.loads((self.root/'work/setup-error.json').read_text())
+        self.assertEqual(value['code'],'disk-space');self.assertIn('3.7 GiB',value['recovery'])
+        self.assertIn('Error code: disk-space',output.getvalue());self.assertFalse((self.root/'setup.log').exists())
+    def test_check_failure_does_not_write_error_file(self):
+        with mock.patch.object(setup,'ROOT',self.root),mock.patch.object(setup,'main',side_effect=ValueError('bad input')),mock.patch.object(sys,'argv',['Setup.py','--check']),contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(setup.entrypoint(),1)
+        self.assertFalse((self.root/'work').exists())
+    def test_generic_build_error_reports_compiler_reason_and_stage(self):
+        error=subprocess.CalledProcessError(2,['fixture-build'],output='a command\nfile.c:23: fatal error: missing fixture.h\nmake: *** [object] Error 1')
+        value=diagnose(error,stage=dict(number=8,total=12,label='Compile single-player'))
+        self.assertEqual(value['code'],'build-failed');self.assertIn('missing fixture.h',value['message']);self.assertIn('step 8/12',value['message'])
     def test_staged_success_and_resume(self):
         with self.session() as session:
             session.stage(1,2,'Asset-free child');session.run([sys.executable,'-c','print("child-output")']);session.done()

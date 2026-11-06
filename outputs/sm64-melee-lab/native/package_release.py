@@ -3,7 +3,7 @@
 from pathlib import Path
 import hashlib,json,shutil,stat,zipfile
 HERE=Path(__file__).resolve().parent;LAB=HERE.parent;RELEASE=LAB/'release'
-VERSION='0.6.0-beta.2'
+VERSION='0.6.0-beta.3'
 def package_name(target):return 'SuperMelee64-'+VERSION+'-'+target+('-experimental' if target=='windows' else '')+'-source-kit'
 SCRIPTS=('build_adventure.py','build_embedded.py','build_compositor.py','build_selection_art.py','build_branding.py','build_mac_app.py','build_campaign.py','build_host.py','prepare_sm64_host.py','compile_castle.py','refresh_melee.py','relink_embedded.py','play_embedded.py','verify_stage_starts.py','choose_character.py','native_lineup.py','session_lock.py','campaign.json','package_release.py','build_coop.py','prepare_coop_host.py','play_coop.py','verify_coop.py','build_install_helper.py','build_bootstrap.py','verify_coop_features.py','verify_coop_campaign.py','verify_air.py','verify_rounds.py','coop_network_safety.py','verify_network_safety.py','verify_repository.py','verify_bootstrap.py','verify_release.py','verify_beta.py','export_public_source.py','update_download_links.py','title_lettering.py','verify_npc_placement.py')
 FORBIDDEN={'.iso','.gcm','.z64','.n64','.v64','.rvz','.dat','.usd','.dol','.smm','.dll','.dylib','.exe','.o','.obj','.a','.lib','.mp4','.bin'}
@@ -16,7 +16,7 @@ def build():
     sources=[HERE/name for name in SCRIPTS]+[p for p in HERE.iterdir() if p.suffix in ('.c','.cpp','.inc','.h','.m','.patch') and not p.name.startswith('test_')]
     # These contain no game data; the CSS atlas and preview caches stay in work/.
     brand_names=('Super Melee 64.png','Super Melee 64 Rendered.png','Super Melee 64.icns','Super Melee 64.ico','Super Melee 64 Icon.png','logo.rgba')
-    docs=('SmashRoyale-bootstrap.zip','Setup.py','setup_support.py','mac_toolchain.py','prepare_installer_inputs.py','installer_tests.py','installer_windows_support.ps1','installer_tests.ps1','WindowsLauncher.cpp','SetupWindows.ps1','InstallHelper.swift','Install Helper.ps1','START HERE.txt','THIRD-PARTY.txt','UPSTREAM-LICENSING.txt','COPYING-port.txt')
+    docs=('SmashRoyale-bootstrap.zip','Setup.py','setup_support.py','setup_diagnostics.py','mac_toolchain.py','prepare_installer_inputs.py','installer_tests.py','installer_windows_support.ps1','installer_tests.ps1','WindowsLauncher.cpp','SetupWindows.ps1','InstallHelper.swift','Install Helper.ps1','START HERE.txt','THIRD-PARTY.txt','UPSTREAM-LICENSING.txt','COPYING-port.txt')
     dist=RELEASE/'dist';dist.mkdir(exist_ok=True);artifacts=[]
     for target in ('mac','windows'):
         name=package_name(target);stage=dist/name

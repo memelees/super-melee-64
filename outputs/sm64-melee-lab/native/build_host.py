@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """Build the host for macOS or Windows with pinned SDL2/GLEW inputs."""
 from pathlib import Path
-import hashlib,os,shutil,subprocess,tarfile,urllib.request
+import hashlib,os,shutil,subprocess,sys,tarfile,urllib.request
 HERE=Path(__file__).resolve().parent;ROOT=HERE.parents[2]
 DOWNLOADS={
  'SDL2-devel-2.32.10-mingw.tar.gz':('https://github.com/libsdl-org/SDL/releases/download/release-2.32.10/SDL2-devel-2.32.10-mingw.tar.gz','83a5d74012311edc3c0d40ea6faecbe57ad692aa033fa5dc273cc937e3938ff2'),
  'glew-2.2.0.tgz':('https://github.com/nigels-com/glew/releases/download/glew-2.2.0/glew-2.2.0.tgz','d4fc82893cfb00109578d0a1a2337fb8ca335b3ceccf97b97e5cc7f08e4353e1')}
+def make_program():
+    make=shutil.which('gmake') or (shutil.which('make') if sys.platform!='darwin' else None)
+    if not make:
+        raise RuntimeError('GNU Make is required. On Mac choose Prepare Build Tools in the latest installer, or run brew install make, then Build / Resume. Apple\'s bundled Make 3.81 cannot build these sources.')
+    return make
 def prepare_windows():
     cache=ROOT/'work/release-deps';cache.mkdir(parents=True,exist_ok=True)
     for filename,(url,digest) in DOWNLOADS.items():
@@ -25,8 +30,11 @@ def prepare_windows():
 
 def build():
     windows=os.environ.get('SMB_BUILD_TARGET')=='windows';source=ROOT/'work/sm64ex-source'
-    make=shutil.which('gmake') or shutil.which('make')
-    command=[make,'-C',str(source),'-j8','VERSION=us','BETTERCAMERA=1','BUILD_DIR='+('build/us_melee_bridge_windows' if windows else 'build/us_melee_bridge')]
+    make=make_program()
+    build_dir='build/us_melee_bridge_windows' if windows else 'build/us_melee_bridge'
+    # Prepare the generated include's parent explicitly, including on resume.
+    (source/build_dir).mkdir(parents=True,exist_ok=True)
+    command=[make,'-C',str(source),'-j8','VERSION=us','BETTERCAMERA=1','BUILD_DIR='+build_dir]
     if windows:
         sdl,glew=prepare_windows();cc=os.environ.get('SMB_WINDOWS_CC','x86_64-w64-mingw32-gcc')
         # Quoted flags are evaluated by make's shell; installation paths cannot contain spaces.

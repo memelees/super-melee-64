@@ -4,7 +4,9 @@ from pathlib import Path
 import argparse,hashlib,importlib.util,json,os,platform,plistlib,shlex,shutil,subprocess,sys,time
 from setup_support import Session,SetupCancelled,filesystem_report,require_filesystem,checkout_pinned,atomic_json
 from mac_toolchain import MacToolchainError,mac_gcc,mac_build_environment,mac_toolchain_report
+from setup_diagnostics import diagnose,format_diagnostic
 SESSION=None
+CURRENT_STAGE=None
 
 def root_path():
     for path in (Path(__file__).resolve().parent,*Path(__file__).resolve().parents):
@@ -54,7 +56,7 @@ def checkout(name,path):
 
 def preflight(target):
     required=['git','cmake','ninja','patch','xdelta3','curl']
-    if target=='mac':required+=['clang','clang++','pkg-config','sdl2-config']
+    if target=='mac':required+=['clang','clang++','pkg-config','sdl2-config','gmake']
     else:required+=['x86_64-w64-mingw32-gcc','x86_64-w64-mingw32-g++','x86_64-w64-mingw32-ar','sh','make']
     missing=[x for x in required if not shutil.which(x)]
     if target=='mac' and not mac_gcc():missing.append('Homebrew GCC (Prepare Build Tools)')
@@ -130,7 +132,8 @@ def copy_owned_input(source,target,algorithm,expected):
     partial.replace(target)
 
 def main():
-    global SESSION
+    global SESSION,CURRENT_STAGE
+    CURRENT_STAGE=None
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--platform',choices=['mac','windows'],default='windows' if os.name=='nt' else 'mac')
     parser.add_argument('--rom',type=Path);parser.add_argument('--melee',type=Path)
@@ -157,9 +160,10 @@ def main():
     if missing:raise RuntimeError('Install the prerequisites in START HERE.txt: '+', '.join(missing))
     require_filesystem(ROOT,args.minimum_free_gib)
     if args.platform=='mac' and (sys.platform!='darwin' or platform.machine()!='arm64' or int(platform.mac_ver()[0].split('.')[0] or 0)<15):raise RuntimeError('The Mac target currently requires Apple Silicon and macOS 15+.')
-    with Session(ROOT,dict(inputs=identities,pins=PINS,bootstrap=report['source_bootstrap']),args.cancel_file) as session:
+    with Session(ROOT,dict(inputs=identities,pins=PINS,bootstrap=report['source_bootstrap'],version=VERSION),args.cancel_file) as session:
         SESSION=session
         try:
+            print('Installer version: '+VERSION,flush=True)
             (ROOT/'work/setup-error.json').unlink(missing_ok=True)
             build_env=None
             if args.platform=='mac':
@@ -175,7 +179,10 @@ def main():
 
 def install(args,rom,disc,identities,build_env=None):
     work=ROOT/'work';work.mkdir(exist_ok=True)
-    def stage(number,label):SESSION.stage(number,12,label)
+    def stage(number,label):
+        global CURRENT_STAGE
+        CURRENT_STAGE=dict(number=number,total=12,label=label)
+        SESSION.stage(number,12,label)
     stage(1,'Prepare pinned source dependencies')
     upstream=work/'deps/smash-royale';host=work/'sm64ex-source'
     extract_bootstrap(BOOTSTRAP,upstream)
@@ -238,7 +245,17 @@ def install(args,rom,disc,identities,build_env=None):
         run(['open',ROOT/'Super Melee 64.app'] if args.platform=='mac' else [ROOT/'Super Melee 64.exe'])
     SESSION.done()
     return 0
-if __name__=='__main__':
-    try:raise SystemExit(main())
-    except SetupCancelled as error:print(str(error),file=sys.stderr);raise SystemExit(130)
-    except (ValueError,RuntimeError,subprocess.CalledProcessError) as error:print('\nSetup stopped: '+str(error),file=sys.stderr);raise SystemExit(1)
+def entrypoint():
+    try:return main()
+    except SetupCancelled as error:print(str(error),file=sys.stderr);return 130
+    except (ValueError,RuntimeError,OSError,subprocess.CalledProcessError) as error:
+        diagnostic=diagnose(error,stage=CURRENT_STAGE,version=VERSION)
+        # Early input/tool/disk failures happen before Session opens setup.log.
+        # Save their explanation too, so either desktop helper can display it.
+        if not any(flag in sys.argv for flag in ('--check','--check-tools')):
+            try:atomic_json(ROOT/'work/setup-error.json',diagnostic)
+            except OSError:pass # A read-only/full disk must not hide the error.
+        print('\n'+format_diagnostic(diagnostic)+'\nLogs: setup-gui.log (Mac), setup-events.log (Windows), setup.log',file=sys.stderr)
+        return 1
+
+if __name__=='__main__':raise SystemExit(entrypoint())

@@ -19,9 +19,11 @@ def windows_lua(cc):
     return library
 
 def build():
+    from build_host import make_program
+    make=make_program()
     from prepare_coop_host import prepare
     prepare()
-    command=[shutil.which('gmake') or 'make','-C',str(ROOT/'work/sm64coopdx-melee'),'-j8','VERSION=us','USE_APP=0','DISCORD_SDK=0','COOPNET=1','UPDATER=0','CP=cp']
+    command=[make,'-C',str(ROOT/'work/sm64coopdx-melee'),'-j8','VERSION=us','USE_APP=0','DISCORD_SDK=0','COOPNET=1','UPDATER=0','CP=cp']
     if os.environ.get('SMB_BUILD_TARGET')=='windows':
         from build_host import prepare_windows
         sdl,glew=prepare_windows();runtime=Path(os.environ.get('SMB_RUNTIME_DIR',ROOT/'work/melee-embedded'));zlib=runtime/'abi/build-deps/zlib-build'

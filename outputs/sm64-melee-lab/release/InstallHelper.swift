@@ -6,6 +6,25 @@ struct SetupDiagnostic: Codable {
 }
 func toolDiagnostic(_ output: String) -> SetupDiagnostic? {
     let lower = output.lowercased()
+    if lower.contains("gmake") && lower.contains("prerequisites") || lower.contains("level_rules.mk") && lower.contains("no such file") || lower.contains("gnu make is required") {
+        return SetupDiagnostic(code:"gnu-make",title:"Install GNU Make",
+            message:"The SM64 build needs GNU Make. Apple's bundled Make 3.81 skips required preparation steps.",
+            recovery:"Choose Prepare Build Tools in the latest installer. Manual repair: run brew install make in Terminal. Then choose Build / Resume in the same folder. Verified downloads are kept.")
+    }
+    if lower.contains("gib is available") || lower.contains("no space left on device") || lower.contains("disk full") {
+        return SetupDiagnostic(code:"disk-space",title:"More free disk space is needed",
+            message:output.components(separatedBy:"\n").last(where:{$0.lowercased().contains("gib is available")}) ?? "The build drive ran out of free space.",
+            recovery:"Free space on the build drive, or use Build Folder to choose another writable drive. At least 12 GiB free is required; 20 GiB is recommended. Then choose Build / Resume. Verified downloads are kept.")
+    }
+    if lower.contains("without spaces") {
+        return SetupDiagnostic(code:"build-path",title:"Choose a build folder without spaces",message:"The source build tools cannot use this build-folder path.",recovery:"Use Build Folder to choose a writable path such as ~/SuperMelee64. Game filenames may contain spaces.")
+    }
+    if lower.contains("permission denied") || lower.contains("not writable") {
+        return SetupDiagnostic(code:"folder-access",title:"Setup cannot write a required file",message:"The current account does not have access to the selected build folder or file.",recovery:"Choose a writable build folder owned by your account. Do not run setup as root or administrator. Your original game files are unchanged.")
+    }
+    if ["could not resolve host","connection timed out","failed to connect","curl: ("].contains(where:lower.contains) {
+        return SetupDiagnostic(code:"download-network",title:"A required download could not finish",message:"The download server or network connection was unavailable.",recovery:"Check your connection and retry the same operation. If the server is temporarily unavailable, wait a few minutes. Existing verified downloads are kept.")
+    }
     if lower.contains("license") && ["agree", "accept", "review"].contains(where: lower.contains) {
         return SetupDiagnostic(code:"xcode-license",title:"Finish Xcode setup",
             message:"Apple is blocking the build tools until the Xcode licence has been reviewed.",
@@ -79,9 +98,13 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var process: Process?, preparing=false, stopped=false, recentOutput=""
     var kit: URL { Bundle.main.resourceURL!.appendingPathComponent("SourceKit") }
     var cancelFile: URL {destination.appendingPathComponent("work/setup.cancel")}
+    var installerVersion: String {Bundle.main.object(forInfoDictionaryKey:"SMBInstallerVersion") as? String ?? "development"}
+    func attemptHeader(_ action:String) {
+        append("\nSUPER MELEE 64 INSTALLER \(installerVersion) — \(ISO8601DateFormatter().string(from:Date())) — \(action)\n")
+    }
     func applicationDidFinishLaunching(_ notification: Notification) {
         window=NSWindow(contentRect:NSRect(x:0,y:0,width:720,height:650),styleMask:[.titled,.closable,.miniaturizable],backing:.buffered,defer:false)
-        window.title="Install Super Melee 64";window.center();window.delegate=self
+        window.title="Install Super Melee 64 — \(installerVersion)";window.center();window.delegate=self
         let content=window.contentView!
         let title=NSTextField(labelWithString:"Super Melee 64");title.font = .boldSystemFont(ofSize:28)
         title.frame=NSRect(x:26,y:592,width:660,height:38);content.addSubview(title)
@@ -102,6 +125,7 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let scroll=NSScrollView(frame:NSRect(x:24,y:24,width:672,height:248));scroll.hasVerticalScroller=true
         log.isEditable=false;log.font = .monospacedSystemFont(ofSize:11,weight:.regular);scroll.documentView=log;content.addSubview(scroll)
         window.makeKeyAndOrderFront(nil);NSApp.activate(ignoringOtherApps:true)
+        attemptHeader("Opened installer")
         append("Your original US SM64 and Melee USA Rev 2 files stay on this Mac. Setup downloads official patches and builds the game locally.\nAllow at least 12 GiB free; 20 GiB is recommended. Cancel keeps verified downloads for Resume.\n")
         if CommandLine.arguments.count>1 {accept(CommandLine.arguments.dropFirst().filter{!$0.hasPrefix("--")}.map{URL(fileURLWithPath:$0)})}
     }
@@ -140,17 +164,23 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc func openLog() {
         let path=destination.appendingPathComponent("setup.log")
         let gui=destination.appendingPathComponent("setup-gui.log")
-        NSWorkspace.shared.open(FileManager.default.fileExists(atPath:path.path) ? path : FileManager.default.fileExists(atPath:gui.path) ? gui : destination)
+        // GUI output includes failures before the backend Session opens setup.log.
+        NSWorkspace.shared.open(FileManager.default.fileExists(atPath:gui.path) ? gui : FileManager.default.fileExists(atPath:path.path) ? path : destination)
     }
     func failed(_ diagnostic: SetupDiagnostic?) {
-        guard let diagnostic else {status.stringValue="Setup stopped. Open Setup Log for details. Verified downloads are kept.";return}
+        let diagnostic=diagnostic ?? SetupDiagnostic(code:"setup-failed",title:"Setup could not continue",
+            message:"The setup process stopped without a recognised error. The complete output is in the setup log.",
+            recovery:"Open Setup Log and share the latest attempt with the project maintainer. Include the installer version and error code below. Build / Resume keeps verified downloads and completed outputs.")
         status.stringValue=diagnostic.title+". Follow the repair instructions, then retry."
-        append("\n"+diagnostic.title+"\n"+diagnostic.message+"\n"+diagnostic.recovery+"\n")
+        let details=diagnostic.title+"\n"+diagnostic.message+"\n\n"+diagnostic.recovery+"\n\nError code: "+diagnostic.code+"\nInstaller version: "+installerVersion
+        append("\n"+details+"\n")
         let alert=NSAlert();alert.alertStyle = .warning;alert.messageText=diagnostic.title
-        alert.informativeText=diagnostic.message+"\n\n"+diagnostic.recovery
+        alert.informativeText=diagnostic.message+"\n\n"+diagnostic.recovery+"\n\nError code: "+diagnostic.code+"\nInstaller version: "+installerVersion
         alert.addButton(withTitle:"OK");alert.addButton(withTitle:"Open Setup Log")
+        alert.addButton(withTitle:"Copy Error Details")
         alert.beginSheetModal(for:window) { [weak self] response in
             if response == .alertSecondButtonReturn {self?.openLog()}
+            if response == .alertThirdButtonReturn {NSPasteboard.general.clearContents();NSPasteboard.general.setString(details,forType:.string)}
         }
     }
     @objc func stop() {
@@ -187,6 +217,8 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
     @objc func prepareTools() {
         guard process==nil else{return};stopped=false;preparing=true
+        try? FileManager.default.createDirectory(at:destination,withIntermediateDirectories:true)
+        attemptHeader("Prepare Build Tools")
         guard FileManager.default.fileExists(atPath:"/Library/Developer/CommandLineTools/usr/bin/clang") || FileManager.default.fileExists(atPath:"/Applications/Xcode.app") else {
             execute("/usr/bin/xcode-select",["--install"]) { [weak self] _ in self?.status.stringValue="Finish Apple's tools installer, then choose Prepare Build Tools again.";self?.cancel.isEnabled=false };return
         }
@@ -197,7 +229,7 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         try? FileManager.default.createDirectory(at:destination,withIntermediateDirectories:true)
         let python="/opt/homebrew/opt/python@3.12/bin/python3.12",venv=destination.appendingPathComponent(".venv")
-        let commands:[(String,[String])]=[("/opt/homebrew/bin/brew",["install","python@3.12","gcc","cmake","ninja","sdl2","sdl3","glew","pkg-config","xdelta","sevenzip"]),(python,["-m","venv",venv.path]),(venv.appendingPathComponent("bin/python").path,["-m","pip","install","Pillow==11.3.0"])]
+        let commands:[(String,[String])]=[("/opt/homebrew/bin/brew",["install","python@3.12","gcc","make","cmake","ninja","sdl2","sdl3","glew","pkg-config","xdelta","sevenzip"]),(python,["-m","venv",venv.path]),(venv.appendingPathComponent("bin/python").path,["-m","pip","install","Pillow==11.3.0"])]
         func next(_ index:Int) {
             if stopped || index==commands.count {preparing=false;cancel.isEnabled=false;accept([]);status.stringValue=stopped ? "Tool preparation stopped. Retry when ready." : "Build tools prepared. Choose Build / Resume.";return}
             status.stringValue="Preparing build tools…";let command=commands[index]
@@ -214,8 +246,10 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
     @objc func start() {
         guard let rom,let melee,process==nil else{return};stopped=false;preparing=false
+        try? FileManager.default.createDirectory(at:destination,withIntermediateDirectories:true)
+        attemptHeader("Build / Resume")
         guard let python=setupPython(destination) ?? setupPython(kit) else {
-            status.stringValue="Choose Prepare Build Tools first.";return
+            failed(SetupDiagnostic(code:"missing-python",title:"Prepare the Python build tools",message:"Setup needs Python 3.12 or newer with Pillow to build the game.",recovery:"Choose Prepare Build Tools, let it finish, then choose Build / Resume. The finished game does not need Python during gameplay."));return
         }
         do {
             if destination.path.contains(where:{$0.isWhitespace}) {throw NSError(domain:"Setup",code:1,userInfo:[NSLocalizedDescriptionKey:"Choose a build folder without spaces. Game filenames may contain spaces."])}
@@ -225,7 +259,7 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
             for name in ["native","release","branding"] {
                 let out=target.appendingPathComponent(name);try FileManager.default.createDirectory(at:out,withIntermediateDirectories:true)
                 let copy=Process();copy.executableURL=URL(fileURLWithPath:"/usr/bin/rsync");copy.arguments=["-a","--exclude=dist","--exclude=*.app","--exclude=__pycache__",source.appendingPathComponent(name).path+"/",out.path+"/"]
-                try copy.run();copy.waitUntilExit();if copy.terminationStatus != 0 {throw NSError(domain:"Setup",code:3)}
+                try copy.run();copy.waitUntilExit();if copy.terminationStatus != 0 {throw NSError(domain:"Setup",code:3,userInfo:[NSLocalizedDescriptionKey:"The installer could not copy its source kit into the build folder. Check the folder is writable and the drive has space, then extract the complete release ZIP again if needed."])}
             }
             var arguments=[target.appendingPathComponent("release/Setup.py").path,"--rom",rom.path,"--melee",melee.path,"--cancel-file",cancelFile.path,"--launch"]
             if CommandLine.arguments.contains("--check"){arguments=Array(arguments.dropLast())+["--check"]}
@@ -238,7 +272,10 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 else if code==130 || self.stopped {self.status.stringValue="Stopped safely. Choose Build / Resume to continue."}
                 else {self.failed(savedDiagnostic(self.destination.appendingPathComponent("work/setup-error.json")) ?? toolDiagnostic(self.recentOutput))}
             }
-        } catch {status.stringValue=error.localizedDescription;append(error.localizedDescription+"\n");accept([])}
+        } catch {
+            append(error.localizedDescription+"\n");accept([])
+            failed(toolDiagnostic(error.localizedDescription) ?? SetupDiagnostic(code:"prepare-folder",title:"The installer could not prepare the build folder",message:error.localizedDescription,recovery:"Check the build folder is writable and the complete release ZIP has been extracted. Choose the same folder to resume verified downloads, or a new empty folder if you want a fresh install."))
+        }
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender:NSApplication)->Bool {process==nil}
 }

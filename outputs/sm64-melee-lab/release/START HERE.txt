@@ -1,4 +1,4 @@
-SUPER MELEE 64 — 0.6.0-beta.2 / NATIVE14
+SUPER MELEE 64 — 0.6.0-beta.3 / NATIVE14
 
 This source-only beta builds the game locally from your own game files. It
 includes the installer, original integration source and project artwork. No
@@ -35,7 +35,7 @@ https://support.apple.com/en-us/102445
 The game itself needs no Python, Homebrew or terminal after installation.
 
 Manual prerequisites: Xcode Command Line Tools, Homebrew, Python 3.12+, Pillow,
-gcc-16, CMake, Ninja, SDL2/SDL3, GLEW, pkg-config, xdelta3, 7-Zip, Git, patch,
+gcc-16, GNU Make 4+ (gmake), CMake, Ninja, SDL2/SDL3, GLEW, pkg-config, xdelta3, 7-Zip, Git, patch,
 and curl. Prepare Build Tools checks these and guides missing steps.
 CLI (extract to a directory without spaces):
   python3 Setup.py --platform mac --rom /path/game.z64 --melee /path/game.iso
@@ -54,10 +54,21 @@ details to setup.log. The installer never accepts Apple's licence for you.
 - Outdated tools or missing headers: install the Apple Command Line Tools update
   from System Settings > General > Software Update; open Xcode if you use it.
 - Missing GCC: choose Prepare Build Tools to install Homebrew's GCC compiler.
+- Missing gmake or a level_rules.mk directory error: choose Prepare Build Tools
+  in the latest installer. It installs Homebrew's GNU Make. Apple's bundled
+  Make 3.81 cannot run the pinned source's build preparation. Manual repair:
+    brew install make
 Then choose Prepare Build Tools and Build / Resume in the SAME build folder.
 Existing game inputs, downloaded patches and build outputs are preserved.
 When updating the installer, extract the new kit and open its new installer app;
 select the original build folder so its updated setup source can resume there.
+Open Setup Log opens setup-gui.log, including errors before compilation starts.
+The window title and new log entries show the installer version.
+If setup stops, the message explains the cause and the next repair step, with an
+error code and installer version. Mac users can choose Copy Error Details.
+Pre-build failures such as low disk space also have a saved diagnostic; you do
+not need to find a compiler traceback to understand the problem. If the message
+does not identify the cause, send the latest setup log and error details.
 
 WINDOWS — EXPERIMENTAL x64 WINDOWS 10/11 BETA
 1. Extract the complete Windows kit to C:\SuperMelee64 (no spaces/OneDrive).
