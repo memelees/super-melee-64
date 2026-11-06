@@ -8,6 +8,7 @@ import Setup as setup
 import prepare_installer_inputs as inputs
 import mac_toolchain as mac
 import build_host
+import build_coop
 from setup_diagnostics import diagnose,format_diagnostic
 
 class InstallerTests(unittest.TestCase):
@@ -29,6 +30,23 @@ class InstallerTests(unittest.TestCase):
     def test_mac_prerequisites_require_gmake_even_when_apple_make_exists(self):
         with mock.patch.object(setup.shutil,'which',side_effect=lambda name: None if name=='gmake' else '/fixture/'+name),mock.patch.object(setup,'mac_gcc',return_value='/fixture/gcc'),mock.patch.object(setup.importlib.util,'find_spec',return_value=True):
             self.assertIn('gmake',setup.preflight('mac'))
+    def test_mac_preflight_catches_each_sound_tool_before_downloads(self):
+        for missing in build_host.MAC_SOUND_TOOLS:
+            with self.subTest(tool=missing),mock.patch.object(setup.shutil,'which',side_effect=lambda name: None if name==missing else '/fixture/'+name),mock.patch.object(setup,'mac_gcc',return_value='/fixture/gcc'),mock.patch.object(setup.importlib.util,'find_spec',return_value=True):
+                self.assertEqual(setup.preflight('mac'),[missing])
+                self.assertNotIn(missing,setup.preflight('windows'))
+    def test_mac_builders_stop_before_compilation_without_sound_tools(self):
+        with mock.patch.object(build_host.sys,'platform','darwin'),mock.patch.dict(os.environ,{'SMB_BUILD_TARGET':'mac'}),mock.patch.object(build_host,'ROOT',self.root),mock.patch.object(build_host,'make_program',return_value='fixture-gmake'),mock.patch.object(build_host.shutil,'which',return_value=None),mock.patch.object(build_host.subprocess,'run',side_effect=AssertionError('Build must not start with missing tools')):
+            for builder in (build_host.build,build_coop.build):
+                with self.subTest(builder=builder.__module__),self.assertRaisesRegex(RuntimeError,'brew install mingw-w64'):
+                    builder()
+    def test_native_mac_build_selects_all_three_sound_tools(self):
+        with mock.patch.object(build_host.sys,'platform','darwin'),mock.patch.object(build_host.shutil,'which',side_effect=lambda name: '/fixture/'+name):
+            self.assertEqual(build_host.mac_sound_tools(),[key+'=/fixture/'+name for key,name in zip(('AS','OBJCOPY','OBJDUMP'),build_host.MAC_SOUND_TOOLS)])
+    def test_other_hosts_do_not_require_mac_sound_tools(self):
+        for platform in ('linux','win32'):
+            with self.subTest(platform=platform),mock.patch.object(build_host.sys,'platform',platform),mock.patch.object(build_host.shutil,'which',side_effect=AssertionError('Mac tool check on another host')):
+                self.assertEqual(build_host.mac_sound_tools(),[])
     @unittest.skipUnless(os.name!='nt' and (shutil.which('gmake') or shutil.which('make')),'POSIX make fixture requires Mac or Linux')
     def test_host_build_generates_early_make_include_from_empty_directory(self):
         source=self.root/'work/sm64ex-source';source.mkdir(parents=True)
@@ -115,6 +133,26 @@ class InstallerTests(unittest.TestCase):
         error=subprocess.CalledProcessError(2,['fixture-build'],output='a command\nfile.c:23: fatal error: missing fixture.h\nmake: *** [object] Error 1')
         value=diagnose(error,stage=dict(number=8,total=12,label='Compile single-player'))
         self.assertEqual(value['code'],'build-failed');self.assertIn('missing fixture.h',value['message']);self.assertIn('step 8/12',value['message'])
+    def test_missing_sound_tool_survives_parallel_output_and_python_traceback(self):
+        for tool in build_host.MAC_SOUND_TOOLS:
+            with self.subTest(tool=tool):
+                output='compile sound data\ngmake: '+tool+': No such file or directory\ngmake: *** [sound.o] Error 127\ngmake: *** Waiting for unfinished jobs....\n'+('encode another sample\n'*80)+'Traceback (most recent call last):\n  File "build.py", line 20, in build\nsubprocess.CalledProcessError: Command returned non-zero exit status 2.\n'
+                error=subprocess.CalledProcessError(1,['fixture-build'],output=output)
+                value=diagnose(error,stage=dict(number=8,total=12,label='Compile single-player'))
+                self.assertEqual(value['code'],'mac-sound-tools');self.assertIn('brew install mingw-w64',value['recovery'])
+                self.assertIn('step 8/12',value['message']);self.assertNotIn('CalledProcessError',value['message'])
+    def test_compiler_error_is_preferred_to_nested_python_wrapper(self):
+        output='file.c:42: error: fixture type mismatch\nmake: *** [object] Error 1\nTraceback (most recent call last):\nsubprocess.CalledProcessError: Command returned non-zero exit status 2.'
+        value=diagnose(subprocess.CalledProcessError(1,['fixture-build'],output=output),stage=dict(number=8,total=12,label='Compile single-player'))
+        self.assertIn('fixture type mismatch',value['message']);self.assertNotIn('CalledProcessError',value['message'])
+    def test_assembler_input_error_does_not_report_a_missing_executable(self):
+        output='i686-w64-mingw32-as -o sound.o sound.s\nsound.s:3: Error: missing fixture include: No such file or directory\nmake: *** [object] Error 1'
+        value=diagnose(subprocess.CalledProcessError(1,['fixture-build'],output=output),stage=dict(number=8,total=12,label='Compile single-player'))
+        self.assertEqual(value['code'],'build-failed');self.assertIn('missing fixture include',value['message'])
+    def test_missing_generic_tool_is_preferred_to_nested_python_wrapper(self):
+        output='gmake: fixture-assembler: No such file or directory\nmake: *** [object] Error 127\nsubprocess.CalledProcessError: Command returned non-zero exit status 2.'
+        value=diagnose(subprocess.CalledProcessError(1,['fixture-build'],output=output),stage=dict(number=8,total=12,label='Compile single-player'))
+        self.assertIn('fixture-assembler',value['message']);self.assertNotIn('CalledProcessError',value['message'])
     def test_staged_success_and_resume(self):
         with self.session() as session:
             session.stage(1,2,'Asset-free child');session.run([sys.executable,'-c','print("child-output")']);session.done()

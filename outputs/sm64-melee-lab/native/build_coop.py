@@ -19,11 +19,13 @@ def windows_lua(cc):
     return library
 
 def build():
-    from build_host import make_program
+    from build_host import make_program,mac_sound_tools
     make=make_program()
+    sound_tools=mac_sound_tools() if os.environ.get('SMB_BUILD_TARGET')!='windows' else []
     from prepare_coop_host import prepare
     prepare()
     command=[make,'-C',str(ROOT/'work/sm64coopdx-melee'),'-j8','VERSION=us','USE_APP=0','DISCORD_SDK=0','COOPNET=1','UPDATER=0','CP=cp']
+    command+=sound_tools
     if os.environ.get('SMB_BUILD_TARGET')=='windows':
         from build_host import prepare_windows
         sdl,glew=prepare_windows();runtime=Path(os.environ.get('SMB_RUNTIME_DIR',ROOT/'work/melee-embedded'));zlib=runtime/'abi/build-deps/zlib-build'

@@ -16,6 +16,7 @@ ROOT=root_path();NATIVE=ROOT/'outputs/sm64-melee-lab/native'
 sys.path.insert(0,str(NATIVE))
 from build_bootstrap import PIN as ADAPTER_PIN, verify as verify_bootstrap, extract as extract_bootstrap, configure_local_sources
 from package_release import VERSION
+from build_host import MAC_SOUND_TOOLS
 BOOTSTRAP=Path(__file__).resolve().parent/'SmashRoyale-bootstrap.zip'
 PINS={'smash-royale':('bundled-source-bootstrap',ADAPTER_PIN),
       'sm64ex-source':('https://github.com/sm64pc/sm64ex.git','d7ca2c04364a6dd0dac58b47151e04e26887e6f0'),
@@ -56,7 +57,7 @@ def checkout(name,path):
 
 def preflight(target):
     required=['git','cmake','ninja','patch','xdelta3','curl']
-    if target=='mac':required+=['clang','clang++','pkg-config','sdl2-config','gmake']
+    if target=='mac':required+=['clang','clang++','pkg-config','sdl2-config','gmake',*MAC_SOUND_TOOLS]
     else:required+=['x86_64-w64-mingw32-gcc','x86_64-w64-mingw32-g++','x86_64-w64-mingw32-ar','sh','make']
     missing=[x for x in required if not shutil.which(x)]
     if target=='mac' and not mac_gcc():missing.append('Homebrew GCC (Prepare Build Tools)')

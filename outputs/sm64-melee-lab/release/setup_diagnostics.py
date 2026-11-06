@@ -28,6 +28,11 @@ def diagnose(error, *, stage=None, version='development'):
         return result('disk-full', 'The build drive ran out of space',
             'Setup could not finish writing a download or build file.',
             'Free space on the build drive; aim for at least 20 GiB free. ' + RESUME)
+    missing_sound_tool=re.search(r'i686-w64-mingw32-(?:as|objcopy|objdump)[\'\"]?:\s*(?:no such file|(?:command )?not found)',lower)
+    if missing_sound_tool or 'sm64 sound build tools are missing' in lower or ('prerequisites' in lower and 'i686-w64-mingw32-' in lower):
+        return result('mac-sound-tools', 'Install the SM64 sound build tools',
+            'The Mac build is missing tools used to assemble SM64\'s sound data. Homebrew provides them in mingw-w64; the game still runs natively on Mac.',
+            'Choose Prepare Build Tools in the latest installer. Manual repair: run brew install mingw-w64 in Terminal. ' + RESUME)
     if ('level_rules.mk' in lower and ('no such file' in lower or 'cannot open' in lower)) or 'gnu make is required' in lower or ('gmake' in lower and 'prerequisites' in lower):
         return result('gnu-make', 'Install GNU Make',
             'The SM64 build needs GNU Make. Apple\'s bundled Make 3.81 skips required preparation steps.',
@@ -79,8 +84,13 @@ def diagnose(error, *, stage=None, version='development'):
         return result('incomplete-kit', 'The extracted installer kit is incomplete',
             'Setup could not find a required project source file.',
             'Extract the entire latest release ZIP, then open the installer from that extracted folder. Keep the existing build folder so the new helper can resume it.')
-    lines=[line.strip() for line in detail.splitlines() if re.search(r'(?i)(fatal error:|error:|undefined symbols|undefined reference|ninja:|make.*\*\*\*)', line)]
-    summary=next((line for line in lines if 'fatal error:' in line.lower() or 'error:' in line.lower()), lines[-1] if lines else str(error))[:1200]
+    # Nested build scripts append Python tracebacks after the real compiler/tool
+    # error. CalledProcessError is a wrapper, not the reason compilation failed.
+    lines=[line.strip() for line in detail.splitlines()
+           if not re.search(r'(?i)(CalledProcessError|Traceback|^\s*File ")',line)]
+    patterns=(r'(?i)(fatal error:|\berror:|undefined symbols|undefined reference)',
+              r'(?i)(not found|no such file|cannot (?:find|open)|ninja:|make.*\*\*\*)')
+    summary=next((line for pattern in patterns for line in lines if re.search(pattern,line)),str(error))[:1200]
     return result('build-failed' if stage else 'setup-failed', 'The game build stopped' if stage else 'Setup could not continue',
         summary or 'The setup process exited without an error message.',
         'Open Setup Log for the complete output. Share the installer version, error code and log with the project maintainer. ' + RESUME)

@@ -3,7 +3,7 @@
 from pathlib import Path
 import hashlib,json,shutil,stat,zipfile
 HERE=Path(__file__).resolve().parent;LAB=HERE.parent;RELEASE=LAB/'release'
-VERSION='0.6.0-beta.3'
+VERSION='0.6.0-beta.4'
 def package_name(target):return 'SuperMelee64-'+VERSION+'-'+target+('-experimental' if target=='windows' else '')+'-source-kit'
 SCRIPTS=('build_adventure.py','build_embedded.py','build_compositor.py','build_selection_art.py','build_branding.py','build_mac_app.py','build_campaign.py','build_host.py','prepare_sm64_host.py','compile_castle.py','refresh_melee.py','relink_embedded.py','play_embedded.py','verify_stage_starts.py','choose_character.py','native_lineup.py','session_lock.py','campaign.json','package_release.py','build_coop.py','prepare_coop_host.py','play_coop.py','verify_coop.py','build_install_helper.py','build_bootstrap.py','verify_coop_features.py','verify_coop_campaign.py','verify_air.py','verify_rounds.py','coop_network_safety.py','verify_network_safety.py','verify_repository.py','verify_bootstrap.py','verify_release.py','verify_beta.py','export_public_source.py','update_download_links.py','title_lettering.py','verify_npc_placement.py')
 FORBIDDEN={'.iso','.gcm','.z64','.n64','.v64','.rvz','.dat','.usd','.dol','.smm','.dll','.dylib','.exe','.o','.obj','.a','.lib','.mp4','.bin'}

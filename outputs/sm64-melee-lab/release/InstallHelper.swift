@@ -6,6 +6,12 @@ struct SetupDiagnostic: Codable {
 }
 func toolDiagnostic(_ output: String) -> SetupDiagnostic? {
     let lower = output.lowercased()
+    let missingSoundTool = lower.range(of:"i686-w64-mingw32-(?:as|objcopy|objdump)['\"]?:\\s*(?:no such file|(?:command )?not found)",options:.regularExpression) != nil
+    if missingSoundTool || lower.contains("sm64 sound build tools are missing") || lower.contains("prerequisites") && lower.contains("i686-w64-mingw32-") {
+        return SetupDiagnostic(code:"mac-sound-tools",title:"Install the SM64 sound build tools",
+            message:"The Mac build is missing tools used to assemble SM64's sound data. Homebrew provides them in mingw-w64; the game still runs natively on Mac.",
+            recovery:"Choose Prepare Build Tools in the latest installer. Manual repair: run brew install mingw-w64 in Terminal. Then choose Build / Resume in the same folder. Verified downloads and build outputs are kept.")
+    }
     if lower.contains("gmake") && lower.contains("prerequisites") || lower.contains("level_rules.mk") && lower.contains("no such file") || lower.contains("gnu make is required") {
         return SetupDiagnostic(code:"gnu-make",title:"Install GNU Make",
             message:"The SM64 build needs GNU Make. Apple's bundled Make 3.81 skips required preparation steps.",
@@ -229,7 +235,7 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         try? FileManager.default.createDirectory(at:destination,withIntermediateDirectories:true)
         let python="/opt/homebrew/opt/python@3.12/bin/python3.12",venv=destination.appendingPathComponent(".venv")
-        let commands:[(String,[String])]=[("/opt/homebrew/bin/brew",["install","python@3.12","gcc","make","cmake","ninja","sdl2","sdl3","glew","pkg-config","xdelta","sevenzip"]),(python,["-m","venv",venv.path]),(venv.appendingPathComponent("bin/python").path,["-m","pip","install","Pillow==11.3.0"])]
+        let commands:[(String,[String])]=[("/opt/homebrew/bin/brew",["install","python@3.12","gcc","make","mingw-w64","cmake","ninja","sdl2","sdl3","glew","pkg-config","xdelta","sevenzip"]),(python,["-m","venv",venv.path]),(venv.appendingPathComponent("bin/python").path,["-m","pip","install","Pillow==11.3.0"])]
         func next(_ index:Int) {
             if stopped || index==commands.count {preparing=false;cancel.isEnabled=false;accept([]);status.stringValue=stopped ? "Tool preparation stopped. Retry when ready." : "Build tools prepared. Choose Build / Resume.";return}
             status.stringValue="Preparing build tools…";let command=commands[index]

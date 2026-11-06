@@ -1,4 +1,4 @@
-SUPER MELEE 64 — 0.6.0-beta.3 / NATIVE14
+SUPER MELEE 64 — 0.6.0-beta.4 / NATIVE14
 
 This source-only beta builds the game locally from your own game files. It
 includes the installer, original integration source and project artwork. No
@@ -35,7 +35,8 @@ https://support.apple.com/en-us/102445
 The game itself needs no Python, Homebrew or terminal after installation.
 
 Manual prerequisites: Xcode Command Line Tools, Homebrew, Python 3.12+, Pillow,
-gcc-16, GNU Make 4+ (gmake), CMake, Ninja, SDL2/SDL3, GLEW, pkg-config, xdelta3, 7-Zip, Git, patch,
+gcc-16, GNU Make 4+ (gmake), mingw-w64 (SM64 sound assembler/objcopy/objdump),
+CMake, Ninja, SDL2/SDL3, GLEW, pkg-config, xdelta3, 7-Zip, Git, patch,
 and curl. Prepare Build Tools checks these and guides missing steps.
 CLI (extract to a directory without spaces):
   python3 Setup.py --platform mac --rom /path/game.z64 --melee /path/game.iso
@@ -58,6 +59,10 @@ details to setup.log. The installer never accepts Apple's licence for you.
   in the latest installer. It installs Homebrew's GNU Make. Apple's bundled
   Make 3.81 cannot run the pinned source's build preparation. Manual repair:
     brew install make
+- Missing i686-w64-mingw32-as, objcopy or objdump: choose Prepare Build Tools
+  in the latest installer. Both Mac hosts use these GNU tools to build SM64's
+  sound data; this does not make the game a Windows app. Manual repair:
+    brew install mingw-w64
 Then choose Prepare Build Tools and Build / Resume in the SAME build folder.
 Existing game inputs, downloaded patches and build outputs are preserved.
 When updating the installer, extract the new kit and open its new installer app;
