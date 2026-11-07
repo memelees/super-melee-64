@@ -8,11 +8,11 @@ Akaneia characters and optional enemy fighters.
 
 <!-- DOWNLOAD_BUTTONS_START -->
 <p align="center">
-  <a href="https://github.com/memelees/super-melee-64/releases/download/v0.6.0-beta.7/SuperMelee64-0.6.0-beta.7-mac-source-kit.zip"><img src="https://img.shields.io/badge/Download_for_Mac-2563EB?style=for-the-badge" alt="Download for Mac" height="44"></a>
-  <a href="https://github.com/memelees/super-melee-64/releases/download/v0.6.0-beta.7/SuperMelee64-0.6.0-beta.7-windows-experimental-source-kit.zip"><img src="https://img.shields.io/badge/Download_for_Windows-198754?style=for-the-badge" alt="Download for Windows" height="44"></a>
+  <a href="https://github.com/memelees/super-melee-64/releases/download/v0.6.0-beta.8/SuperMelee64-0.6.0-beta.8-mac-source-kit.zip"><img src="https://img.shields.io/badge/Download_for_Mac-2563EB?style=for-the-badge" alt="Download for Mac" height="44"></a>
+  <a href="https://github.com/memelees/super-melee-64/releases/download/v0.6.0-beta.8/SuperMelee64-0.6.0-beta.8-windows-experimental-source-kit.zip"><img src="https://img.shields.io/badge/Download_for_Windows-198754?style=for-the-badge" alt="Download for Windows" height="44"></a>
 </p>
 <p align="center">Beta installers · Mac: Apple Silicon, macOS 15+ · Windows x64: experimental beta · Linux: not available</p>
-<p align="center"><a href="https://github.com/memelees/super-melee-64/releases/download/v0.6.0-beta.7/SuperMelee64-0.6.0-beta.7-mac-source-kit.zip">Mac ZIP</a> · <a href="https://github.com/memelees/super-melee-64/releases/download/v0.6.0-beta.7/SuperMelee64-0.6.0-beta.7-windows-experimental-source-kit.zip">Windows ZIP</a> · <a href="https://github.com/memelees/super-melee-64/releases/tag/v0.6.0-beta.7">Release notes — 0.6.0-beta.7 (beta)</a></p>
+<p align="center"><a href="https://github.com/memelees/super-melee-64/releases/download/v0.6.0-beta.8/SuperMelee64-0.6.0-beta.8-mac-source-kit.zip">Mac ZIP</a> · <a href="https://github.com/memelees/super-melee-64/releases/download/v0.6.0-beta.8/SuperMelee64-0.6.0-beta.8-windows-experimental-source-kit.zip">Windows ZIP</a> · <a href="https://github.com/memelees/super-melee-64/releases/tag/v0.6.0-beta.8">Release notes — 0.6.0-beta.8 (beta)</a></p>
 <!-- DOWNLOAD_BUTTONS_END -->
 
 <a id="install"></a>
