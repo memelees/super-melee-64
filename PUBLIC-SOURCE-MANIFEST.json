@@ -5,11 +5,10 @@
   "private_source_commit_metadata_included": false,
   "historical_evidence_omitted_by_default": true,
   "selected_historical_evidence_files": 1,
-  "files_with_sanitization_changes": 0,
+  "files_with_sanitization_changes": 3,
   "files": {
     ".github/ISSUE_TEMPLATE/bug_report.md": "ba0e39673e391f42372fe9b02b329b2195795c3450b8df0c1ae9a935130a6403",
-    ".github/workflows/import-source.yml": "66c7016bb45a4277493bacb5132a1fe3ba9be6af4062e51dd96def17b0885054",
-    ".github/workflows/source-checks.yml": "4aa877ca456e434dd07b0c802f26ba764345337894b133d63cd3288d3ac4c3f2",
+    ".github/workflows/source-checks.yml": "842c12203072ae29332673865c14d0a5c1b75498ee5b66bae233b3bacc37cd13",
     ".github/workflows/update-download-buttons.yml": "47486bac9750c585626f456476dc4635c7a78f6c07c3f2911c74fc24b79a9ee6",
     ".gitignore": "46843b8aaba50b960e3962f392cf74a356df58d4e9acd8c8a60a4330b389729e",
     "CONTRIBUTING.md": "fe17bc1f667a4ab98c783c062695bffd02606762faab70dbf5162aa800a63ef5",
@@ -174,6 +173,6 @@
     "outputs/sm64-melee-lab/release/setup_diagnostics.py": "5edec05cf86f3ad99da697dce2add902aa29f87f2dc7904cacef07e9723ab558",
     "outputs/sm64-melee-lab/release/setup_support.py": "289e9ce9424027aeed04f6339e30173845827a417f10e3ed6f90ac9c0645e240",
     "outputs/sm64-melee-lab/verification/beta-acceptance.json": "352bed5fd285de05f7f8ef50e6b7e2b44ad47647f51d48aae265f44e3d12e961",
-    "outputs/sm64-melee-lab/verification/public-source-audit.json": "b1b8bf42442b3a16ff827d4134a51084cb6fc1ee85461a42b802eab43f03e6ac"
+    "outputs/sm64-melee-lab/verification/public-source-audit.json": "256ac8f874bafb795d3a923098927ce925a6e7b21113f6f523c72444a2d1d19c"
   }
 }
