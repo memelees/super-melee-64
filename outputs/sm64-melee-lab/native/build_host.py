@@ -13,6 +13,16 @@ def copy_build_source(source,target):
     # copy2 would restore the ZIP's reproducible mtime and let Make reuse a
     # stale object, including one left by an older installer's partial build.
     shutil.copyfile(source,target)
+def mac_build_environment(output):
+    """Discard compiled objects from a prior deployment target, retaining assets."""
+    output=Path(output);output.mkdir(parents=True,exist_ok=True)
+    stamp=output/'.super-melee-macos-target'
+    if not stamp.is_file() or stamp.read_text()!='15.0\n':
+        for path in output.rglob('*'):
+            if path.is_file() and (path.suffix in {'.o','.d','.a'} or path.name=='sm64.us.f3dex2e'):
+                path.unlink()
+        stamp.write_text('15.0\n')
+    return dict(os.environ,MACOSX_DEPLOYMENT_TARGET='15.0')
 def make_program():
     make=shutil.which('gmake') or (shutil.which('make') if sys.platform!='darwin' else None)
     if not make:
@@ -48,6 +58,7 @@ def build():
     windows=os.environ.get('SMB_BUILD_TARGET')=='windows';source=ROOT/'work/sm64ex-source'
     make=make_program()
     build_dir='build/us_melee_bridge_windows' if windows else 'build/us_melee_bridge'
+    environment=mac_build_environment(source/build_dir) if not windows and sys.platform=='darwin' else None
     # Prepare the generated include's parent explicitly, including on resume.
     (source/build_dir).mkdir(parents=True,exist_ok=True)
     command=[make,'-C',str(source),'-j8','VERSION=us','BETTERCAMERA=1','BUILD_DIR='+build_dir]
@@ -61,7 +72,7 @@ def build():
             'CC='+cc,'CXX='+cc.replace('gcc','g++'),'LD='+cc.replace('gcc','g++'),
             'CPP='+cc.replace('gcc','cpp')+' -P','AS='+cc.replace('gcc','as'),'OBJCOPY='+cc.replace('gcc','objcopy'),'OBJDUMP='+cc.replace('gcc','objdump'),
             'SDLCONFIG='+str(wrapper),'SMB_EXTRA_CFLAGS=-I'+str(glew/'include'),'SMB_EXTRA_LDFLAGS=-L'+str(glew/'lib')]
-    subprocess.run(command,check=True)
+    subprocess.run(command,check=True,env=environment)
     if windows:
         destination=ROOT/'work/SuperMelee64-Windows';destination.mkdir(exist_ok=True)
         shutil.copy2(source/'build/us_melee_bridge_windows/sm64.us.f3dex2e.exe',destination/'SuperMelee64.exe')

@@ -82,7 +82,9 @@ def mac_build_environment(environment=None):
             'A supported Homebrew GCC compiler was not found. Apple Clang cannot compile the Melee engine.',
             'Choose Prepare Build Tools to install GCC, then Build / Resume. '
             'If you set GCC_BIN yourself, point it at a working Homebrew gcc-N compiler.')
-    environment.update(SDKROOT=sdk, GCC_BIN=gcc)
+    # Compile against the selected SDK while retaining the supported runtime
+    # floor. Otherwise Clang inherits the builder's macOS version on upgrades.
+    environment.update(SDKROOT=sdk, GCC_BIN=gcc, MACOSX_DEPLOYMENT_TARGET='15.0')
     headers = '#include <sys/types.h>\n#include <stdio.h>\n#include <stdint.h>\n#include <stdlib.h>\n'
     c = headers + '''#ifdef __clang__
 #error Melee requires GCC scalar_storage_order support, not Clang
@@ -94,7 +96,7 @@ int main(void) { struct MeleeValue value = { 1 }; return value.value != 1; }
     _probe([gcc, '-x', 'c', '-Werror=attributes', *flags], environment, c)
     _probe(['/usr/bin/clang++', '-x', 'c++', '-std=c++20', *flags], environment,
            headers + '#include <vector>\nint main() { std::vector<int> values{1}; return values[0] != 1; }\n')
-    return environment, dict(ok=True, sdk=sdk, gcc=gcc, developer=developer,
+    return environment, dict(ok=True, sdk=sdk, gcc=gcc, developer=developer,minimum_macos='15.0',
                              c_headers_checked=True, cxx_headers_checked=True)
 
 

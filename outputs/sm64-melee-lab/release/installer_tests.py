@@ -11,6 +11,7 @@ import build_host
 import build_coop
 import build_mac_app as mac_app
 import refresh_melee
+import build_install_helper as mac_helper
 from setup_diagnostics import diagnose,format_diagnostic
 
 class InstallerTests(unittest.TestCase):
@@ -43,6 +44,17 @@ class InstallerTests(unittest.TestCase):
         (contents/'Info.plist').write_bytes(plistlib.dumps(dict(CFBundleIdentifier=identity)))
         (contents/'fixture').write_text(value)
         return app
+    def test_deployment_target_upgrade_discards_old_objects_but_preserves_assets(self):
+        output=self.root/'build';output.mkdir()
+        for name in ('old.o','old.d','old.a','sm64.us.f3dex2e','sound-data.bin'):(output/name).write_text('cached')
+        with mock.patch.dict(os.environ,{'MACOSX_DEPLOYMENT_TARGET':'27.0'}):
+            environment=build_host.mac_build_environment(output)
+        self.assertEqual(environment['MACOSX_DEPLOYMENT_TARGET'],'15.0')
+        self.assertEqual((output/'sound-data.bin').read_text(),'cached')
+        self.assertFalse((output/'old.o').exists());self.assertFalse((output/'sm64.us.f3dex2e').exists())
+        (output/'current.o').write_text('correct target')
+        build_host.mac_build_environment(output)
+        self.assertEqual((output/'current.o').read_text(),'correct target')
     def test_mac_install_defaults_to_shared_or_personal_applications(self):
         shared=self.root/'Shared Applications';shared.mkdir();personal=self.root/'User Applications'
         with mock.patch.object(mac_app.os,'access',return_value=True):
@@ -372,7 +384,7 @@ int main(int argc,char** argv){(void)argv;embedded=argc>1;int config=0;
     def test_mac_sdk_and_compilers_are_explicit_with_spaces_and_stale_environment(self):
         sdk=self.root/'Apple SDK/MacOSX.sdk';header=sdk/'usr/include/sys/types.h'
         header.parent.mkdir(parents=True);header.write_text('/* fixture header */')
-        original={'PATH':'/fixture/tools','SDKROOT':'/removed/old-sdk','KEEP':'unchanged'}
+        original={'PATH':'/fixture/tools','SDKROOT':'/removed/old-sdk','KEEP':'unchanged','MACOSX_DEPLOYMENT_TARGET':'27.0'}
         calls=[]
         def probe(command,environment,source=None):
             calls.append((command,dict(environment),source))
@@ -383,6 +395,7 @@ int main(int argc,char** argv){(void)argv;embedded=argc>1;int config=0;
             environment,report=mac.mac_build_environment(original)
         self.assertEqual(original['SDKROOT'],'/removed/old-sdk');self.assertEqual(environment['KEEP'],'unchanged')
         self.assertEqual(environment['SDKROOT'],str(sdk));self.assertEqual(environment['GCC_BIN'],'/fixture/gcc-16')
+        self.assertEqual(environment['MACOSX_DEPLOYMENT_TARGET'],'15.0');self.assertEqual(original['MACOSX_DEPLOYMENT_TARGET'],'27.0')
         self.assertNotIn('SDKROOT',calls[0][1]);self.assertNotIn('SDKROOT',calls[1][1])
         self.assertEqual(len(calls),4)
         for command,env,source in calls[2:]:
@@ -490,9 +503,25 @@ class MacHelperTests(unittest.TestCase):
     def setUpClass(cls):
         cls.build=tempfile.TemporaryDirectory(prefix='supermelee-mac-helper-')
         cls.helper=Path(cls.build.name)/'InstallSuperMelee64'
-        subprocess.run(['xcrun','swiftc',str(Path(__file__).with_name('InstallHelper.swift')),'-o',str(cls.helper)],check=True)
+        with mock.patch.dict(os.environ,{'MACOSX_DEPLOYMENT_TARGET':'27.0'}):
+            mac_helper.compile_helper(Path(__file__).with_name('InstallHelper.swift'),cls.helper)
     @classmethod
     def tearDownClass(cls):cls.build.cleanup()
+    def test_compiled_helper_targets_macos_15_despite_newer_builder_environment(self):
+        self.assertEqual(mac_helper.verify_binary(self.helper),dict(architecture='arm64',minimum_macos='15.0'))
+    def test_newer_binary_minimum_is_rejected(self):
+        # Change only the real compiled load-command minimum, without executing
+        # the fixture. This models the accidentally published beta.7 binary.
+        data=bytearray(self.helper.read_bytes());offset=32
+        import struct
+        for _ in range(struct.unpack_from('<I',data,16)[0]):
+            command,length=struct.unpack_from('<2I',data,offset)
+            if command==0x32:
+                struct.pack_into('<I',data,offset+12,27<<16);break
+            offset+=length
+        else:self.fail('Missing compiler deployment-target load command')
+        changed=Path(self.build.name)/'newer-minimum';changed.write_bytes(data)
+        with self.assertRaisesRegex(ValueError,'macOS 15.0 exactly'):mac_helper.verify_binary(changed)
     def test_same_size_same_timestamp_upgrade_replaces_source_and_bytecode(self):
         with tempfile.TemporaryDirectory(prefix='supermelee-upgrade-') as folder:
             root=Path(folder);source=root/'new kit';target=root/'existing build/outputs/sm64-melee-lab'

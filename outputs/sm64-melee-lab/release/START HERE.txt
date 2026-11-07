@@ -17,6 +17,9 @@ verified official Akaneia/Melee3D patches. No private repository login is needed
 Your game files stay local and are never modified in place or uploaded.
 
 MAC — APPLE SILICON, macOS 15+
+The latest macOS is not required. macOS 26.4 is within the supported range.
+Intel Macs are not supported. Beta.8 fixes beta.7's accidental macOS 27
+installer minimum; both the executable and its app metadata now target 15.0.
 1. Extract the Mac kit and open Install Super Melee 64.app.
 2. Drop BOTH game files into the window, or choose them. Select Build / Resume.
 3. Setup checks prerequisites, prepares missing Homebrew packages and a private

@@ -2,7 +2,7 @@
 """Validate current compiled encounter policy and source kits without gameplay."""
 from pathlib import Path, PurePosixPath
 from datetime import datetime
-import argparse,ctypes,hashlib,importlib.util,json,os,re,shutil,subprocess,sys,zipfile
+import argparse,ctypes,hashlib,importlib.util,json,os,plistlib,re,shutil,subprocess,sys,zipfile
 from package_release import VERSION,package_name,FORBIDDEN
 from build_bootstrap import verify as verify_bootstrap
 from build_campaign import validate as validate_campaign
@@ -80,9 +80,15 @@ def package_check(target,work,rom,disc):
     assert checked.returncode==0,checked.stdout+checked.stderr
     result=json.loads(checked.stdout);assert result['played'] is False and result['downloaded'] is False
     assert result['source_bootstrap']['revision']==source['revision']
-    if target=='mac' and sys.platform=='darwin':
-        subprocess.run(['codesign','--verify','--deep','--strict',str(kit/'Install Super Melee 64.app')],check=True)
-    return dict(platform=target,version=manifest['version'],manifest_verified=True,current_native_source_matches=True,bootstrap_verified=True,extracted_setup_preflight=True,preflight_host=sys.platform,archive_sha256=sha(archive),bytes=archive.stat().st_size)
+    compatibility={}
+    if target=='mac':
+        from build_install_helper import verify_binary,MINIMUM_MACOS
+        helper=kit/'Install Super Melee 64.app/Contents'
+        assert plistlib.loads((helper/'Info.plist').read_bytes())['LSMinimumSystemVersion']==MINIMUM_MACOS
+        compatibility=verify_binary(helper/'MacOS/InstallSuperMelee64')
+        assert manifest['installer_compatibility']==compatibility
+        if sys.platform=='darwin':subprocess.run(['codesign','--verify','--deep','--strict',str(kit/'Install Super Melee 64.app')],check=True)
+    return dict(platform=target,version=manifest['version'],manifest_verified=True,current_native_source_matches=True,bootstrap_verified=True,extracted_setup_preflight=True,preflight_host=sys.platform,archive_sha256=sha(archive),bytes=archive.stat().st_size,installer_compatibility=compatibility)
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)

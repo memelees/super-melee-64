@@ -3,7 +3,7 @@
 from pathlib import Path
 import hashlib,json,shutil,stat,zipfile
 HERE=Path(__file__).resolve().parent;LAB=HERE.parent;RELEASE=LAB/'release'
-VERSION='0.6.0-beta.7'
+VERSION='0.6.0-beta.8'
 def package_name(target):return 'SuperMelee64-'+VERSION+'-'+target+('-experimental' if target=='windows' else '')+'-source-kit'
 SCRIPTS=('build_adventure.py','build_embedded.py','build_compositor.py','build_selection_art.py','build_branding.py','build_mac_app.py','build_campaign.py','build_host.py','prepare_sm64_host.py','compile_castle.py','refresh_melee.py','relink_embedded.py','play_embedded.py','verify_stage_starts.py','choose_character.py','native_lineup.py','session_lock.py','campaign.json','package_release.py','build_coop.py','prepare_coop_host.py','play_coop.py','verify_coop.py','build_install_helper.py','build_bootstrap.py','verify_coop_features.py','verify_coop_campaign.py','verify_air.py','verify_rounds.py','coop_network_safety.py','verify_network_safety.py','verify_repository.py','verify_bootstrap.py','verify_release.py','verify_beta.py','export_public_source.py','update_download_links.py','title_lettering.py','verify_npc_placement.py')
 FORBIDDEN={'.iso','.gcm','.z64','.n64','.v64','.rvz','.dat','.usd','.dol','.smm','.dll','.dylib','.exe','.o','.obj','.a','.lib','.mp4','.bin'}
@@ -48,6 +48,12 @@ def build():
             bootstrap=dict(sha256=sha(RELEASE/'SmashRoyale-bootstrap.zip'),revision=verify_bootstrap()['revision'],files=len(verify_bootstrap()['files'])),
             pins={'melee_adapter':verify_bootstrap()['revision'],'sm64ex':'d7ca2c04364a6dd0dac58b47151e04e26887e6f0','melee_pc':'0cc24fee6b8e7dd7a9233daa126829d374fe1f40','sm64coopdx':'8cd6e5977d9f920d51ca71f2c61801d019ed79c6'},
             files={str(p.relative_to(stage)):sha(p) for p in sorted(stage.rglob('*')) if p.is_file()})
+        if target=='mac':
+            from build_install_helper import verify_binary,MINIMUM_MACOS
+            helper=stage/'Install Super Melee 64.app/Contents'
+            import plistlib
+            assert plistlib.loads((helper/'Info.plist').read_bytes())['LSMinimumSystemVersion']==MINIMUM_MACOS
+            manifest['installer_compatibility']=verify_binary(helper/'MacOS/InstallSuperMelee64')
         (stage/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
         files=[p for p in stage.rglob('*') if p.is_file()]
         for path in files:
