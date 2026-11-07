@@ -63,6 +63,23 @@ jobs:
       - name: Verify packet routines with address and undefined behavior sanitizers
         run: python3 outputs/sm64-melee-lab/native/verify_network_safety.py --source "$RUNNER_TEMP/coop-stock"
 
+  mac-installer-source:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Check out source without build credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Use Python 3.12 for installer tests
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - name: Test installer backend and compiled Mac helper without game files
+        run: python outputs/sm64-melee-lab/release/installer_tests.py
+
   windows-installer-source:
     runs-on: windows-latest
     timeout-minutes: 15
