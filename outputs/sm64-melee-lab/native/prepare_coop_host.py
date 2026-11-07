@@ -7,6 +7,7 @@ single-player engine remain independent of this network host.
 from pathlib import Path
 import re,shutil,subprocess
 from coop_network_safety import patched_sources
+from build_host import copy_build_source
 HERE=Path(__file__).resolve().parent;ROOT=HERE.parents[2]
 SOURCE=ROOT/'work/sm64coopdx-melee'
 def original(name):
@@ -82,7 +83,7 @@ endif
     save('Makefile',make)
     for path in HERE.iterdir():
         if path.name in ('sm64_air.inc','sm64_air_scenarios.inc','sm64_round_scenarios.inc','bridge_protocol.h','sm64_platform.h','sm64_gl_composite.inc','sm64_npcs.inc','sm64_npc_environment.inc','sm64_npc_water.inc','sm64_campaign.inc','sm64_stage_starts.inc','sm64_combat.inc','sm64_options.inc','sm64_coop.inc','sm64_coop_transport.inc','sm64_coop_grabs.inc','sm64_coop_campaign.inc','sm64_launch_coop.inc','sm64_record_capture.inc','sm64_recording.m','sm64_recording_windows.cpp','sm64_finish_scenarios.inc','sm64_swim_control_scenarios.inc','sm64_interaction_scenarios.inc'):
-            shutil.copy2(path,SOURCE/'src/pc'/path.name)
+            copy_build_source(path,SOURCE/'src/pc'/path.name)
     source=(HERE/'sm64_host_bridge.c').read_text()
     source='#define SMB_COOP_CAMPAIGN 1\n#include "game/object_helpers.h"\n#include "behavior_data.h"\n#include "model_ids.h"\n'+source
     source=source.replace('void smb_record_toggle(void);', '#define WARP_OP_UNKNOWN_01 WARP_OP_LOOK_UP\n#define save_file_get_cannon_flags(file,course) save_file_is_cannon_unlocked(file,(course)+1)\n#define save_file_do_save(file) save_file_do_save(file, TRUE)\n#define find_surface_on_ray(a,b,c,d) find_surface_on_ray(a,b,c,d,1.f)\nstatic float gDefaultSoundArgs[3];\nvoid smb_record_toggle(void);')

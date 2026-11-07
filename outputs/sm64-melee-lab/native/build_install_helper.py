@@ -27,10 +27,17 @@ def stage(app):
     if documentation.is_dir():shutil.copytree(documentation,resources/'SourceKit/docs')
     shutil.copy2(LAB/'branding/Super Melee 64.icns',resources/'Super Melee 64.icns')
     (contents/'Info.plist').write_bytes(plistlib.dumps(dict(CFBundleIdentifier='dev.supermelee64.installer',CFBundleExecutable='InstallSuperMelee64',CFBundleVersion=VERSION.replace('-beta.','b'),CFBundleShortVersionString=VERSION.split('-')[0],SMBInstallerVersion=VERSION,CFBundleName='Install Super Melee 64',CFBundlePackageType='APPL',CFBundleIconFile='Super Melee 64.icns',NSHighResolutionCapable=True,CFBundleDocumentTypes=[dict(CFBundleTypeName='Game images',CFBundleTypeRole='Viewer',CFBundleTypeExtensions=['iso','gcm','z64'])])))
+    # Finder/cloud-backed build folders can add metadata forbidden by codesign.
+    # Remove only those two attributes from the newly staged bundle (Apple QA1940).
+    for attribute in ('com.apple.FinderInfo','com.apple.ResourceFork'):
+        subprocess.run(['/usr/bin/xattr','-r','-d',attribute,str(app)],check=True)
     identity=os.environ.get('SMB_CODESIGN_IDENTITY','-')
     command=['codesign','--force','--sign',identity]
     if identity!='-':command+=['--options','runtime','--timestamp']
-    subprocess.run([*command,str(app)],check=True,capture_output=True)
+    subprocess.run([*command,str(app)],check=True)
+    # File providers may attach Finder metadata while codesign is running.
+    for attribute in ('com.apple.FinderInfo','com.apple.ResourceFork'):
+        subprocess.run(['/usr/bin/xattr','-r','-d',attribute,str(app)],check=True)
     subprocess.run(['codesign','--verify','--deep','--strict',str(app)],check=True)
     return app
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Asset-free installer tests. Never install tools, build engines or start games."""
 from pathlib import Path
-import contextlib,hashlib,importlib.util,io,json,os,shutil,subprocess,sys,tempfile,threading,time,unittest
+import contextlib,hashlib,importlib.util,io,json,os,plistlib,shutil,subprocess,sys,tempfile,threading,time,unittest
 from unittest import mock
 import setup_support as support
 import Setup as setup
@@ -9,6 +9,8 @@ import prepare_installer_inputs as inputs
 import mac_toolchain as mac
 import build_host
 import build_coop
+import build_mac_app as mac_app
+import refresh_melee
 from setup_diagnostics import diagnose,format_diagnostic
 
 class InstallerTests(unittest.TestCase):
@@ -21,6 +23,115 @@ class InstallerTests(unittest.TestCase):
     def test_public_adapter_is_bundled(self):
         self.assertEqual(setup.PINS['smash-royale'],('bundled-source-bootstrap',setup.ADAPTER_PIN))
         self.assertFalse(setup.ADAPTER_PIN.startswith('http'))
+    @unittest.skipUnless(os.name!='nt' and (shutil.which('gmake') or shutil.which('make')),'Native Make fixture requires Mac or Linux')
+    def test_reproducible_zip_source_update_rebuilds_cached_native_output(self):
+        kit=self.root/'kit';kit.mkdir();source=kit/'fixture.c';source.write_text('old version\n')
+        target=self.root/'fixture.c'
+        built=self.root/'fixture.o'
+        (self.root/'Makefile').write_text('fixture.o: fixture.c\n\tcp fixture.c fixture.o\n')
+        source.write_text('new version\n');os.utime(source,(1700000000,1700000000))
+        # Also cover a source already copied by an older installer, whose
+        # cached object never rebuilt because copy2 kept the ZIP's old mtime.
+        for prior in ('old version\n','new version\n'):
+            target.write_text(prior);os.utime(target,(1700000000,1700000000))
+            built.write_text('old version\n');os.utime(built,(1700000100,1700000100))
+            build_host.copy_build_source(source,target)
+            subprocess.run([shutil.which('gmake') or shutil.which('make')],cwd=self.root,check=True,capture_output=True)
+            self.assertEqual(built.read_text(),'new version\n')
+    def app_fixture(self,parent,value,identity='dev.supermelee64.launcher'):
+        app=parent/'Super Melee 64.app';contents=app/'Contents';contents.mkdir(parents=True)
+        (contents/'Info.plist').write_bytes(plistlib.dumps(dict(CFBundleIdentifier=identity)))
+        (contents/'fixture').write_text(value)
+        return app
+    def test_mac_install_defaults_to_shared_or_personal_applications(self):
+        shared=self.root/'Shared Applications';shared.mkdir();personal=self.root/'User Applications'
+        with mock.patch.object(mac_app.os,'access',return_value=True):
+            self.assertEqual(mac_app.application_destination(shared,personal),shared/'Super Melee 64.app')
+        with mock.patch.object(mac_app.os,'access',return_value=False):
+            self.assertEqual(mac_app.application_destination(shared,personal),personal/'Super Melee 64.app')
+        self.assertFalse(personal.exists())
+    def test_setup_enables_install_mode_and_returns_the_installed_app(self):
+        target=self.app_fixture(self.root/'Applications','installed')
+        with mock.patch.object(setup,'application_destination',return_value=target),mock.patch.object(setup,'run') as run:
+            self.assertEqual(setup.create_mac_launcher(),target)
+        command=run.call_args.args[0]
+        self.assertIn('--install',command)
+        self.assertEqual(command[-2:],['--applications-dir',target.parent])
+        with mock.patch.object(setup,'application_destination',return_value=self.root/'missing.app'),mock.patch.object(setup,'run'):
+            with self.assertRaisesRegex(RuntimeError,'installation did not create'):setup.create_mac_launcher()
+    def test_mac_install_publishes_in_applications_and_retains_previous_version(self):
+        source=self.app_fixture(self.root/'build volume','new');target=self.app_fixture(self.root/'Applications volume','old')
+        with mock.patch.object(mac_app,'clone',side_effect=lambda src,dst:shutil.copytree(src,dst)),mock.patch.object(mac_app,'run') as verify:
+            self.assertEqual(mac_app.publish_app(source,target),target)
+        self.assertEqual((target/'Contents/fixture').read_text(),'new')
+        self.assertEqual((source/'Contents/fixture').read_text(),'new')
+        previous=list(target.parent.glob('.previous-super-melee-app-*'))
+        self.assertEqual(len(previous),1);self.assertEqual((previous[0]/'Contents/fixture').read_text(),'old')
+        # Verify the transfer in the destination filesystem and the final path.
+        self.assertEqual(verify.call_args_list[0].args[-1].parent.parent,target.parent)
+        self.assertEqual(verify.call_args_list[-1].args[-1],target)
+    def test_mac_install_rejects_unsigned_copy_before_replacing_existing_app(self):
+        source=self.app_fixture(self.root/'build','new');target=self.app_fixture(self.root/'Applications','old')
+        with mock.patch.object(mac_app,'clone',side_effect=lambda src,dst:shutil.copytree(src,dst)),mock.patch.object(mac_app,'run',side_effect=subprocess.CalledProcessError(1,['codesign'])):
+            with self.assertRaises(subprocess.CalledProcessError):mac_app.publish_app(source,target)
+        self.assertEqual((target/'Contents/fixture').read_text(),'old')
+        self.assertFalse(list(target.parent.glob('.previous-super-melee-app-*')))
+    def test_mac_install_rolls_back_when_final_verification_fails(self):
+        source=self.app_fixture(self.root/'build','new');target=self.app_fixture(self.root/'Applications','old')
+        def verify(*command):
+            if command[-1]==target:raise subprocess.CalledProcessError(1,['codesign'])
+        with mock.patch.object(mac_app,'clone',side_effect=lambda src,dst:shutil.copytree(src,dst)),mock.patch.object(mac_app,'run',side_effect=verify):
+            with self.assertRaises(subprocess.CalledProcessError):mac_app.publish_app(source,target)
+        self.assertEqual((target/'Contents/fixture').read_text(),'old')
+        self.assertFalse(list(target.parent.glob('.previous-super-melee-app-*')))
+    def test_mac_install_preserves_unrecognized_app_at_destination(self):
+        source=self.app_fixture(self.root/'build','new');target=self.app_fixture(self.root/'Applications','unrelated','other.app')
+        with mock.patch.object(mac_app,'clone',side_effect=AssertionError('An unrelated app must not be replaced')):
+            with self.assertRaises(mac_app.MacAppInstallError):mac_app.publish_app(source,target)
+        self.assertEqual((target/'Contents/fixture').read_text(),'unrelated')
+    def test_mac_install_reports_copy_permissions_without_touching_existing_app(self):
+        source=self.app_fixture(self.root/'build','new');target=self.app_fixture(self.root/'Applications','old')
+        with mock.patch.object(mac_app,'clone',side_effect=PermissionError('fixture folder access')):
+            with self.assertRaises(mac_app.MacAppInstallError) as error:mac_app.publish_app(source,target)
+        self.assertEqual(diagnose(error.exception)['code'],'mac-app-install')
+        self.assertEqual((target/'Contents/fixture').read_text(),'old')
+    def test_packaged_startup_requires_gameplay_even_when_process_exits_zero(self):
+        for output in ('SMB SELECT OPEN\n','SMB HOST FAIL dlopen: missing fixture.dylib\n','SMB HOST EMBED COMPLETE pid=1 host_frames=1 native_ticks=1\n'):
+            def launch(command,**options):
+                log=Path(options['env']['SMB_APP_SMOKE_ROOT'])/'Logs/latest.log';log.parent.mkdir()
+                log.write_text(output)
+                return subprocess.CompletedProcess(command,0,stdout='')
+            with self.subTest(output=output),mock.patch.object(mac_app,'ROOT',self.root),mock.patch.object(mac_app.subprocess,'run',side_effect=launch):
+                with self.assertRaises(mac_app.MacAppStartupError) as error:mac_app.verify_app_startup(self.root/'game.app')
+                self.assertEqual(diagnose(error.exception)['code'],'mac-app-startup')
+    def test_packaged_startup_uses_isolated_saves_and_rejects_environment_overrides(self):
+        def launch(command,**options):
+            self.assertEqual(command[-1],'--app-smoke')
+            for key in ('SM64_MELEE_LIBRARY','MELEE_FILES_DIR','SMB_SMOKE_FRAMES','DYLD_LIBRARY_PATH'):
+                self.assertNotIn(key,options['env'])
+            root=Path(options['env']['SMB_APP_SMOKE_ROOT']);self.assertTrue(root.is_relative_to(self.root/'work'))
+            log=root/'Logs/latest.log';log.parent.mkdir()
+            log.write_text('SMB EMBED CONFIG host_owned=1 discovery=off\nSMB HOST NATIVE RENDER frame=120\nSMB HOST EMBED COMPLETE pid=1 host_frames=180 native_ticks=180\n')
+            return subprocess.CompletedProcess(command,0,stdout='')
+        with mock.patch.object(mac_app,'ROOT',self.root),mock.patch.dict(os.environ,{'SM64_MELEE_LIBRARY':'developer-library','MELEE_FILES_DIR':'developer-assets','SMB_SMOKE_FRAMES':'1','DYLD_LIBRARY_PATH':'external-libraries'}),mock.patch.object(mac_app.subprocess,'run',side_effect=launch):
+            self.assertEqual(mac_app.verify_app_startup(self.root/'game.app')['frames'],180)
+    @unittest.skipUnless(os.name!='nt' and shutil.which('clang'),'Native C fixture requires Clang on Mac or Linux')
+    def test_embedded_engine_skips_standalone_launcher_discovery(self):
+        source='''#include <stdio.h>
+static int embedded,discovery;
+char* getenv(const char* key){(void)key;return embedded?"host-library":NULL;}
+void pc_launcher_configure(int* config){(void)config;discovery++;}
+int main(int argc,char** argv){(void)argv;embedded=argc>1;int config=0;
+    pc_launcher_configure(&config);
+    return discovery;
+}
+'''
+        patched=refresh_melee.host_configured_main(source)
+        self.assertEqual(refresh_melee.host_configured_main(patched),patched)
+        path=self.root/'main.c';path.write_text(patched);exe=self.root/'fixture'
+        subprocess.run(['clang',str(path),'-o',str(exe)],check=True)
+        self.assertEqual(subprocess.run([str(exe)],capture_output=True).returncode,1)
+        self.assertEqual(subprocess.run([str(exe),'embedded'],capture_output=True).returncode,0)
     def test_mac_host_rejects_apple_make_before_build(self):
         with mock.patch.object(build_host.sys,'platform','darwin'),mock.patch.object(build_host.shutil,'which',side_effect=lambda name: '/usr/bin/make' if name=='make' else None):
             with self.assertRaisesRegex(RuntimeError,'brew install make'):build_host.make_program()
@@ -56,7 +167,7 @@ class InstallerTests(unittest.TestCase):
             '$(BUILD_DIR)/level_rules.mk:\n\tprintf "READY := yes\\n" > $@\n'
             'include $(BUILD_DIR)/level_rules.mk\n'
             '$(BUILD_DIR)/complete:\n\ttest "$(READY)" = yes\n\ttouch $@\n')
-        with mock.patch.object(build_host,'ROOT',self.root),mock.patch.dict(os.environ,{'SMB_BUILD_TARGET':'mac'}):
+        with mock.patch.object(build_host,'ROOT',self.root),mock.patch.dict(os.environ,{'SMB_BUILD_TARGET':'mac'}),mock.patch.object(build_host,'mac_sound_tools',return_value=[]):
             build_host.build()
             output=source/'build/us_melee_bridge'
             self.assertTrue((output/'complete').is_file())
@@ -248,10 +359,16 @@ class InstallerTests(unittest.TestCase):
         for name in ('Play Super Melee 64.cmd','Play Super Melee 64.vbs'):
             text=(helper/name).read_text().lower();self.assertNotIn('python',text);self.assertIn('super melee 64.exe',text)
     def test_check_tools_reads_no_games_and_writes_no_setup(self):
-        with mock.patch.object(setup,'ROOT',self.root),mock.patch.object(sys,'argv',['Setup.py','--check-tools']),mock.patch.object(setup,'mac_toolchain_report',return_value={'ok':True}),contextlib.redirect_stdout(io.StringIO()) as output:
+        with mock.patch.object(setup,'ROOT',self.root),mock.patch.object(sys,'argv',['Setup.py','--check-tools']),mock.patch.object(setup,'preflight',return_value=[]),mock.patch.object(setup,'mac_toolchain_report',return_value={'ok':True}),contextlib.redirect_stdout(io.StringIO()) as output:
             self.assertEqual(setup.main(),0)
         report=json.loads(output.getvalue());self.assertIn('missing',report);self.assertIn('filesystem',report)
         self.assertFalse((self.root/'work').exists());self.assertFalse((self.root/'setup.log').exists())
+    def test_check_tools_fails_for_missing_tools_on_either_target(self):
+        for target,missing in [('mac',['i686-w64-mingw32-as']),('windows',['x86_64-w64-mingw32-gcc'])]:
+            with self.subTest(target=target),mock.patch.object(setup,'ROOT',self.root),mock.patch.object(sys,'argv',['Setup.py','--check-tools','--platform',target]),mock.patch.object(setup,'preflight',return_value=missing),mock.patch.object(setup,'mac_toolchain_report',return_value={'ok':True}),contextlib.redirect_stdout(io.StringIO()) as output:
+                self.assertEqual(setup.main(),2)
+                self.assertEqual(json.loads(output.getvalue())['missing'],missing)
+        self.assertFalse((self.root/'work').exists())
     def test_mac_sdk_and_compilers_are_explicit_with_spaces_and_stale_environment(self):
         sdk=self.root/'Apple SDK/MacOSX.sdk';header=sdk/'usr/include/sys/types.h'
         header.parent.mkdir(parents=True);header.write_text('/* fixture header */')
@@ -366,5 +483,93 @@ class InstallerTests(unittest.TestCase):
         support.checkout_pinned(str(origin),revision,target,run)
         self.assertEqual((target/'test-source').read_text(),'asset-free test')
         self.assertFalse(target.with_name('checkout.partial').exists())
+
+@unittest.skipUnless(sys.platform=='darwin','Compiled Mac helper requires AppKit')
+class MacHelperTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.build=tempfile.TemporaryDirectory(prefix='supermelee-mac-helper-')
+        cls.helper=Path(cls.build.name)/'InstallSuperMelee64'
+        subprocess.run(['xcrun','swiftc',str(Path(__file__).with_name('InstallHelper.swift')),'-o',str(cls.helper)],check=True)
+    @classmethod
+    def tearDownClass(cls):cls.build.cleanup()
+    def test_same_size_same_timestamp_upgrade_replaces_source_and_bytecode(self):
+        with tempfile.TemporaryDirectory(prefix='supermelee-upgrade-') as folder:
+            root=Path(folder);source=root/'new kit';target=root/'existing build/outputs/sm64-melee-lab'
+            for base in (source,target):
+                for name in ('native','release','branding'):(base/name).mkdir(parents=True)
+                for name in ('native/version.py','release/Setup.py'):
+                    path=base/name;path.write_text("VERSION='old'\n");os.utime(path,(1700000000,1700000000))
+            # Populate real, valid timestamp-based bytecode for the old source.
+            for directory,module in [('native','version'),('release','Setup')]:
+                subprocess.run([sys.executable,'-c','import '+module],cwd=target/directory,env=dict(os.environ,PYTHONDONTWRITEBYTECODE=''),check=True)
+                self.assertTrue((target/directory/'__pycache__').is_dir())
+            for name in ('native/version.py','release/Setup.py'):
+                path=source/name;path.write_text("VERSION='new'\n");os.utime(path,(1700000000,1700000000))
+            marker=root/'existing build/work/verified-download';marker.parent.mkdir();marker.write_text('keep')
+            venv=root/'existing build/.venv/keep';venv.parent.mkdir();venv.write_text('keep')
+            subprocess.run([str(self.helper),'--sync-source-kit',str(source),str(target)],check=True)
+            for directory,module in [('native','version'),('release','Setup')]:
+                self.assertFalse((target/directory/'__pycache__').exists())
+                result=subprocess.check_output([sys.executable,'-c','import '+module+'; print('+module+'.VERSION)'],cwd=target/directory,text=True)
+                self.assertEqual(result.strip(),'new')
+            self.assertEqual(marker.read_text(),'keep');self.assertEqual(venv.read_text(),'keep')
+    def test_incomplete_source_kit_is_rejected_before_copy(self):
+        with tempfile.TemporaryDirectory(prefix='supermelee-incomplete-') as folder:
+            root=Path(folder);target=root/'existing';target.mkdir()
+            marker=target/'keep';marker.write_text('keep')
+            result=subprocess.run([str(self.helper),'--sync-source-kit',str(root/'missing'),str(target)],capture_output=True,text=True)
+            self.assertNotEqual(result.returncode,0);self.assertIn('complete source kit is missing',result.stderr)
+            self.assertEqual(list(target.iterdir()),[marker])
+    def test_compiled_helper_recognizes_the_sound_tool_failure(self):
+        with tempfile.TemporaryDirectory(prefix='supermelee-diagnostic-') as folder:
+            output=Path(folder)/'output';output.write_text('gmake: i686-w64-mingw32-as: No such file or directory')
+            result=subprocess.check_output([str(self.helper),'--diagnose-output',str(output)],text=True)
+            self.assertEqual(json.loads(result)['code'],'mac-sound-tools')
+    def test_compiled_helper_requires_a_real_installed_app_before_reporting_success(self):
+        with tempfile.TemporaryDirectory(prefix='supermelee-installed-') as folder:
+            root=Path(folder);app=root/'Applications/Super Melee 64.app';contents=app/'Contents'
+            (contents/'MacOS').mkdir(parents=True)
+            (contents/'Info.plist').write_bytes(plistlib.dumps(dict(CFBundleIdentifier='dev.supermelee64.launcher',CFBundleExecutable='Game',CFBundlePackageType='APPL')))
+            executable=contents/'MacOS/Game';executable.write_text('#!/bin/sh\nexit 0\n');executable.chmod(0o755)
+            report=root/'native-app-build.json'
+            report.write_text(json.dumps(dict(app=str(app),installed=True,signature_verified=True,startup_verified=True)))
+            result=subprocess.check_output([str(self.helper),'--installed-app',str(report)],text=True)
+            self.assertEqual(result.strip(),str(app))
+            for values in [dict(installed=False,signature_verified=True,startup_verified=True),dict(installed=True,signature_verified=False,startup_verified=True),dict(installed=True,signature_verified=True,startup_verified=False)]:
+                report.write_text(json.dumps(dict(app=str(app),**values)))
+                self.assertEqual(subprocess.run([str(self.helper),'--installed-app',str(report)]).returncode,2)
+            report.write_text(json.dumps(dict(app=str(app),installed=True,signature_verified=True,startup_verified=True)))
+            executable.unlink()
+            self.assertEqual(subprocess.run([str(self.helper),'--installed-app',str(report)]).returncode,2)
+    def library_fixture(self,root,token):
+        vendor=root/'vendor prefix';lib=vendor/'lib';lib.mkdir(parents=True)
+        (vendor/'bin').mkdir()
+        leaf=lib/'libleaf.1.dylib';middle=lib/'libmiddle.1.dylib';original=vendor/'bin/game'
+        (root/'leaf.c').write_text('int leaf(void){return 40;}\n')
+        (root/'middle.c').write_text('extern int leaf(void);int middle(void){return leaf()+2;}\n')
+        (root/'main.c').write_text('extern int middle(void);int main(void){return middle()!=42;}\n')
+        subprocess.run(['clang','-dynamiclib',str(root/'leaf.c'),'-o',str(leaf),'-Wl,-install_name,'+token+'/libleaf.1.dylib'],check=True)
+        subprocess.run(['clang','-dynamiclib',str(root/'middle.c'),str(leaf),'-o',str(middle),'-Wl,-install_name,'+str(middle),'-Wl,-rpath,@loader_path/../lib','-Wl,-rpath,.'],check=True)
+        subprocess.run(['clang',str(root/'main.c'),str(middle),'-o',str(original),'-Wl,-rpath,'+str(lib)],check=True)
+        app=root/'Relocated.app';frameworks=app/'Contents/Frameworks';frameworks.mkdir(parents=True)
+        exe=app/'Contents/MacOS/game';exe.parent.mkdir();shutil.copy2(original,exe)
+        return vendor,leaf,original,exe,frameworks
+    def test_bundled_transitive_libraries_run_without_the_original_installation(self):
+        for token in ('@rpath','@loader_path','@executable_path/../lib'):
+            with self.subTest(token=token),tempfile.TemporaryDirectory(prefix='supermelee-dylibs-') as folder:
+                vendor,leaf,original,exe,frameworks=self.library_fixture(Path(folder),token)
+                libraries=mac_app.bundle_libraries(exe,frameworks,origins={exe:original})
+                self.assertEqual(libraries,['libleaf.1.dylib','libmiddle.1.dylib'])
+                mac_app.run('codesign','--force','--sign','-',exe)
+                vendor.rename(vendor.with_name('original-installation-removed'))
+                environment={key:value for key,value in os.environ.items() if not key.startswith('DYLD_')}
+                subprocess.run([str(exe)],env=environment,check=True)
+    def test_missing_transitive_library_stops_packaging(self):
+        with tempfile.TemporaryDirectory(prefix='supermelee-missing-dylib-') as folder:
+            vendor,leaf,original,exe,frameworks=self.library_fixture(Path(folder),'@rpath')
+            leaf.unlink()
+            with self.assertRaisesRegex(ValueError,'Unresolved native library @rpath/libleaf'):
+                mac_app.bundle_libraries(exe,frameworks,origins={exe:original})
 
 if __name__=='__main__':unittest.main(verbosity=2)

@@ -17,6 +17,19 @@ SOURCE=Path(os.environ.get('SMB_ENGINE_SOURCE',str(UP/'build/native-proof/melee-
 BUILD=Path(os.environ.get('SMB_ENGINE_BUILD',str(SOURCE/('build/windows-proof' if WINDOWS else 'build/macos-proof'))))
 sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
 
+def host_configured_main(source):
+    marker='SMB EMBED CONFIG host_owned=1 discovery=off'
+    if marker in source:return source
+    boundary='    pc_launcher_configure(&config);'
+    if source.count(boundary)!=1:raise RuntimeError('Unexpected native launcher configuration boundary')
+    # The host supplies a verified disc, assets, window and input settings.
+    # The standalone donor launcher must not search unrelated user folders.
+    return source.replace(boundary,'''    if (getenv("SM64_MELEE_LIBRARY")) {
+        fprintf(stderr, "SMB EMBED CONFIG host_owned=1 discovery=off\\n");
+    } else {
+        pc_launcher_configure(&config);
+    }''')
+
 def clone(source,destination):
     destination.parent.mkdir(parents=True,exist_ok=True)
     if destination.exists():
@@ -120,6 +133,7 @@ def refresh():
     subprocess.run(['patch','-p1','-i',str(HERE/'embedded-bootstrap.patch')],cwd=patched,check=True)
     for name in ('pc/main.c','pc/vi.c','pc/os.c','pc/m3d_lab.c','melee/gm/gmscene.c','sysdolphin/baselib/video.c'):
         source=patched/name
+        if name=='pc/main.c':source.write_text(host_configured_main(source.read_text()))
         if WINDOWS and name=='pc/main.c':
             source.write_text('#define SDL_MAIN_HANDLED 1\n'+source.read_text().replace('int smb_melee_main(int argc, char* argv[]) {','int smb_melee_main(int argc, char* argv[]) {\n    SDL_SetMainReady();\n    if(!SDL_RegisterApp("SuperMelee64.NativeFighter",0,NULL))return 1;\n    atexit(SDL_UnregisterApp);'))
         game=name not in ('pc/main.c','pc/vi.c','pc/os.c')

@@ -52,6 +52,16 @@ func savedDiagnostic(_ url: URL) -> SetupDiagnostic? {
     guard let data=try? Data(contentsOf:url),data.count<=65536 else{return nil}
     return try? JSONDecoder().decode(SetupDiagnostic.self,from:data)
 }
+func installedGame(_ receipt: URL) -> URL? {
+    struct Receipt: Decodable {let app:String,installed:Bool,signature_verified:Bool,startup_verified:Bool}
+    guard let data=try? Data(contentsOf:receipt),data.count<=65536,
+          let result=try? JSONDecoder().decode(Receipt.self,from:data),
+          result.installed,result.signature_verified,result.startup_verified,result.app.hasPrefix("/") else {return nil}
+    let url=URL(fileURLWithPath:result.app)
+    guard let bundle=Bundle(url:url),bundle.bundleIdentifier=="dev.supermelee64.launcher",
+          let executable=bundle.executableURL,FileManager.default.isExecutableFile(atPath:executable.path) else {return nil}
+    return url
+}
 
 func identifyGame(_ url: URL) -> String? {
     guard let handle=try? FileHandle(forReadingFrom:url) else { return nil }
@@ -60,19 +70,62 @@ func identifyGame(_ url: URL) -> String? {
     if header.prefix(4)==Data([0x80,0x37,0x12,0x40]) { return "sm64" }
     return nil
 }
+func setupEnvironment() -> [String:String] {
+    var environment=ProcessInfo.processInfo.environment
+    let paths=(environment["PATH"] ?? "").split(separator:":").map(String.init)
+    environment["PATH"]=(paths+["/opt/homebrew/opt/python@3.12/bin","/opt/homebrew/bin","/usr/local/bin","/usr/bin","/bin","/usr/sbin","/sbin"]).joined(separator:":")
+    environment["PYTHONUNBUFFERED"]="1"
+    if environment["SSL_CERT_FILE"] == nil {environment["SSL_CERT_FILE"]="/etc/ssl/cert.pem"}
+    return environment
+}
+func setupProgram(_ name: String) -> String? {
+    for directory in (setupEnvironment()["PATH"] ?? "").split(separator:":") {
+        let path=URL(fileURLWithPath:String(directory)).appendingPathComponent(name).path
+        if FileManager.default.isExecutableFile(atPath:path) {return path}
+    }
+    return nil
+}
 func setupPython(_ kit: URL) -> String? {
-    let home = FileManager.default.homeDirectoryForCurrentUser
-    let candidates = [home.appendingPathComponent(".super-melee64/.venv/bin/python").path,
-        kit.appendingPathComponent(".venv/bin/python").path, "/opt/homebrew/bin/python3",
-        "/opt/homebrew/bin/python3.14", "/opt/homebrew/bin/python3.13", "/opt/homebrew/bin/python3.12",
-        "/usr/local/bin/python3"]
+    let candidates = [kit.appendingPathComponent(".venv/bin/python").path] +
+        ["python3","python3.14","python3.13","python3.12"].compactMap(setupProgram)
     for path in candidates where FileManager.default.isExecutableFile(atPath: path) {
         let probe = Process(); probe.executableURL = URL(fileURLWithPath: path)
+        probe.environment=setupEnvironment()
         probe.arguments = ["-c", "import sys; import PIL; sys.exit(0 if sys.version_info >= (3, 12) else 1)"]
         probe.standardOutput = FileHandle.nullDevice; probe.standardError = FileHandle.nullDevice
         do { try probe.run(); probe.waitUntilExit(); if probe.terminationStatus == 0 { return path } } catch { continue }
     }
     return nil
+}
+func synchronizeSourceKit(_ source: URL, to target: URL) throws {
+    guard FileManager.default.fileExists(atPath:source.appendingPathComponent("release/Setup.py").path) else {
+        throw NSError(domain:"Setup",code:2,userInfo:[NSLocalizedDescriptionKey:"The complete source kit is missing. Download and extract it again."])
+    }
+    for name in ["native","release","branding"] {
+        let out=target.appendingPathComponent(name)
+        try FileManager.default.createDirectory(at:out,withIntermediateDirectories:true)
+        let copy=Process();copy.executableURL=URL(fileURLWithPath:"/usr/bin/rsync")
+        // Release ZIPs use reproducible timestamps. Size/mtime alone can retain
+        // older source when an update changes bytes without changing length.
+        copy.arguments=["-a","--checksum","--exclude=dist","--exclude=*.app","--exclude=__pycache__",source.appendingPathComponent(name).path+"/",out.path+"/"]
+        try copy.run();copy.waitUntilExit()
+        if copy.terminationStatus != 0 {throw NSError(domain:"Setup",code:3,userInfo:[NSLocalizedDescriptionKey:"The installer could not copy its source kit into the build folder. Check the folder is writable and the drive has space, then extract the complete release ZIP again if needed."])}
+        // Python's timestamp/size bytecode check has the same upgrade hazard.
+        let cache=out.appendingPathComponent("__pycache__")
+        if FileManager.default.fileExists(atPath:cache.path) {try FileManager.default.removeItem(at:cache)}
+    }
+}
+struct SetupToolReport: Decodable {
+    let missing: [String]
+    struct Toolchain: Decodable {
+        let ok: Bool
+        var code: String?, title: String?, message: String?, recovery: String?, detail: String?
+        var diagnostic: SetupDiagnostic? {
+            guard !ok,let code,let title,let message,let recovery else {return nil}
+            return SetupDiagnostic(code:code,title:title,message:message,recovery:recovery,detail:detail)
+        }
+    }
+    var mac_toolchain: Toolchain?
 }
 final class DropArea: NSView {
     var receive: (([URL]) -> Void)?
@@ -101,6 +154,9 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let log=NSTextView(), progress=NSProgressIndicator()
     let build=NSButton(title:"Build / Resume",target:nil,action:nil)
     let cancel=NSButton(title:"Cancel",target:nil,action:nil)
+    let openInstalled=NSButton(title:"Open Game",target:nil,action:nil)
+    let showInstalled=NSButton(title:"Show in Finder",target:nil,action:nil)
+    var installedApp:URL?
     var process: Process?, preparing=false, stopped=false, recentOutput=""
     var kit: URL { Bundle.main.resourceURL!.appendingPathComponent("SourceKit") }
     var cancelFile: URL {destination.appendingPathComponent("work/setup.cancel")}
@@ -123,9 +179,11 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         button("Choose Files…",#selector(chooseFiles),24,360,140)
         button("Build Folder…",#selector(chooseFolder),170,360,140)
+        openInstalled.target=self;openInstalled.action=#selector(openGame);openInstalled.frame=NSRect(x:320,y:360,width:140,height:32);openInstalled.isHidden=true;content.addSubview(openInstalled)
         build.target=self;build.action=#selector(start);build.frame=NSRect(x:472,y:360,width:224,height:32);build.isEnabled=false;content.addSubview(build)
         button("Prepare Build Tools",#selector(prepareTools),24,316,184)
         button("Open Setup Log",#selector(openLog),220,316,152)
+        showInstalled.target=self;showInstalled.action=#selector(showGame);showInstalled.frame=NSRect(x:388,y:316,width:180,height:32);showInstalled.isHidden=true;content.addSubview(showInstalled)
         cancel.target=self;cancel.action=#selector(stop);cancel.frame=NSRect(x:584,y:316,width:112,height:32);cancel.isEnabled=false;content.addSubview(cancel)
         progress.frame=NSRect(x:26,y:292,width:668,height:14);progress.minValue=0;progress.maxValue=12;progress.isIndeterminate=false;content.addSubview(progress)
         let scroll=NSScrollView(frame:NSRect(x:24,y:24,width:672,height:248));scroll.hasVerticalScroller=true
@@ -134,6 +192,7 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
         attemptHeader("Opened installer")
         append("Your original US SM64 and Melee USA Rev 2 files stay on this Mac. Setup downloads official patches and builds the game locally.\nAllow at least 12 GiB free; 20 GiB is recommended. Cancel keeps verified downloads for Resume.\n")
         if CommandLine.arguments.count>1 {accept(CommandLine.arguments.dropFirst().filter{!$0.hasPrefix("--")}.map{URL(fileURLWithPath:$0)})}
+        _ = refreshInstalledApp()
     }
     func application(_ sender:NSApplication,openFiles filenames:[String]) {accept(filenames.map{URL(fileURLWithPath:$0)});sender.reply(toOpenOrPrint:.success)}
     func accept(_ files:[URL]) {
@@ -151,7 +210,7 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc func chooseFolder() {
         guard process==nil else{return};let panel=NSOpenPanel();panel.title="Choose a writable build folder without spaces"
         panel.canChooseDirectories=true;panel.canChooseFiles=false;panel.canCreateDirectories=true
-        if panel.runModal() == .OK,let folder=panel.url {destination=folder;accept([])}
+        if panel.runModal() == .OK,let folder=panel.url {destination=folder;accept([]);_ = refreshInstalledApp()}
     }
     func append(_ text:String) {
         log.textStorage?.append(NSAttributedString(string:text,attributes:[.foregroundColor:NSColor.textColor,.font:NSFont.monospacedSystemFont(ofSize:11,weight:.regular)]));log.scrollToEndOfDocument(nil)
@@ -172,6 +231,14 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let gui=destination.appendingPathComponent("setup-gui.log")
         // GUI output includes failures before the backend Session opens setup.log.
         NSWorkspace.shared.open(FileManager.default.fileExists(atPath:gui.path) ? gui : FileManager.default.fileExists(atPath:path.path) ? path : destination)
+    }
+    @objc func openGame() {if process==nil,let installedApp {NSWorkspace.shared.open(installedApp)}}
+    @objc func showGame() {if let installedApp {NSWorkspace.shared.activateFileViewerSelecting([installedApp])}}
+    @discardableResult func refreshInstalledApp() -> Bool {
+        installedApp=installedGame(destination.appendingPathComponent("work/native-app-build.json"))
+        openInstalled.isHidden=installedApp==nil;showInstalled.isHidden=installedApp==nil
+        if let installedApp {status.stringValue="Installed: "+installedApp.path;return true}
+        return false
     }
     func failed(_ diagnostic: SetupDiagnostic?) {
         let diagnostic=diagnostic ?? SetupDiagnostic(code:"setup-failed",title:"Setup could not continue",
@@ -196,10 +263,7 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func windowShouldClose(_ sender:NSWindow)->Bool {if process != nil {stop();return false};return true}
     func execute(_ path:String,_ arguments:[String],_ completion:@escaping(Int32)->Void) {
         let task=Process(),pipe=Pipe();task.executableURL=URL(fileURLWithPath:path);task.arguments=arguments
-        var environment=ProcessInfo.processInfo.environment
-        environment["PATH"]="/opt/homebrew/opt/python@3.12/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-        environment["PYTHONUNBUFFERED"]="1";environment["SSL_CERT_FILE"]="/etc/ssl/cert.pem"
-        task.environment=environment;task.standardOutput=pipe;task.standardError=pipe;recentOutput=""
+        task.environment=setupEnvironment();task.standardOutput=pipe;task.standardError=pipe;recentOutput=""
         pipe.fileHandleForReading.readabilityHandler={ [weak self] handle in
             let data=handle.availableData;guard !data.isEmpty else{return}
             DispatchQueue.main.async{
@@ -221,23 +285,46 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
         process=task;build.isEnabled=false;cancel.isEnabled=true
         do {try task.run()} catch {process=nil;append(error.localizedDescription+"\n");completion(1)}
     }
-    @objc func prepareTools() {
+    @objc func prepareTools() {prepareRequiredTools(then:nil)}
+    func prepareRequiredTools(then ready:(()->Void)?) {
         guard process==nil else{return};stopped=false;preparing=true
         try? FileManager.default.createDirectory(at:destination,withIntermediateDirectories:true)
         attemptHeader("Prepare Build Tools")
-        guard FileManager.default.fileExists(atPath:"/Library/Developer/CommandLineTools/usr/bin/clang") || FileManager.default.fileExists(atPath:"/Applications/Xcode.app") else {
-            execute("/usr/bin/xcode-select",["--install"]) { [weak self] _ in self?.status.stringValue="Finish Apple's tools installer, then choose Prepare Build Tools again.";self?.cancel.isEnabled=false };return
+        let selection=Process();selection.executableURL=URL(fileURLWithPath:"/usr/bin/xcode-select");selection.arguments=["-p"]
+        selection.standardOutput=FileHandle.nullDevice;selection.standardError=FileHandle.nullDevice
+        var toolsSelected=false
+        do {try selection.run();selection.waitUntilExit();toolsSelected=selection.terminationStatus==0} catch {append(error.localizedDescription+"\n")}
+        guard toolsSelected else {
+            execute("/usr/bin/xcode-select",["--install"]) { [weak self] _ in self?.preparing=false;self?.status.stringValue="Finish Apple's tools installer, then choose Build / Resume.";self?.cancel.isEnabled=false;self?.accept([]) };return
         }
-        guard FileManager.default.isExecutableFile(atPath:"/opt/homebrew/bin/brew") else {
+        guard let brew=setupProgram("brew") else {
+            preparing=false
             status.stringValue="Install Homebrew from its official site, then choose Prepare Build Tools."
             append("Opening Homebrew's official installation instructions. This helper does not run downloaded shell scripts.\n")
             NSWorkspace.shared.open(URL(string:"https://brew.sh")!);return
         }
-        try? FileManager.default.createDirectory(at:destination,withIntermediateDirectories:true)
-        let python="/opt/homebrew/opt/python@3.12/bin/python3.12",venv=destination.appendingPathComponent(".venv")
-        let commands:[(String,[String])]=[("/opt/homebrew/bin/brew",["install","python@3.12","gcc","make","mingw-w64","cmake","ninja","sdl2","sdl3","glew","pkg-config","xdelta","sevenzip"]),(python,["-m","venv",venv.path]),(venv.appendingPathComponent("bin/python").path,["-m","pip","install","Pillow==11.3.0"])]
+        execute(brew,["--prefix"]) { [weak self] code in
+            guard let self else{return}
+            let prefix=self.recentOutput.trimmingCharacters(in:.whitespacesAndNewlines)
+            guard code==0,!self.stopped,prefix.hasPrefix("/"),!prefix.contains("\n") else {
+                self.preparing=false;self.cancel.isEnabled=false;self.accept([])
+                if self.stopped {self.status.stringValue="Tool preparation stopped. Retry when ready."}
+                else {self.failed(toolDiagnostic(self.recentOutput))};return
+            }
+            self.preparePackages(brew:brew,prefix:prefix,then:ready)
+        }
+    }
+    func preparePackages(brew:String,prefix:String,then ready:(()->Void)?) {
+        let python=prefix+"/opt/python@3.12/bin/python3.12",venv=destination.appendingPathComponent(".venv")
+        let commands:[(String,[String])]=[(brew,["install","python@3.12","gcc","make","mingw-w64","cmake","ninja","sdl2","sdl3","glew","pkg-config","xdelta","sevenzip"]),(python,["-m","venv",venv.path]),(venv.appendingPathComponent("bin/python").path,["-m","pip","install","Pillow==11.3.0"])]
         func next(_ index:Int) {
-            if stopped || index==commands.count {preparing=false;cancel.isEnabled=false;accept([]);status.stringValue=stopped ? "Tool preparation stopped. Retry when ready." : "Build tools prepared. Choose Build / Resume.";return}
+            if stopped {preparing=false;cancel.isEnabled=false;accept([]);status.stringValue="Tool preparation stopped. Retry when ready.";return}
+            if index==commands.count {
+                checkTools(venv.appendingPathComponent("bin/python").path,script:kit.appendingPathComponent("outputs/sm64-melee-lab/release/Setup.py"),prepareIfNeeded:false) {
+                    self.status.stringValue="Build tools verified. Choose Build / Resume."
+                    ready?()
+                };return
+            }
             status.stringValue="Preparing build tools…";let command=commands[index]
             execute(command.0,command.1) { [weak self] code in
                 guard let self else{return}
@@ -250,40 +337,73 @@ final class Installer: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         append("Preparing Homebrew build packages and a private Python environment with Pillow 11.3.0. Homebrew may show its own permission prompts.\n");next(0)
     }
-    @objc func start() {
+    func checkTools(_ python:String,script:URL,prepareIfNeeded:Bool,ready:@escaping()->Void) {
+        preparing=true;status.stringValue="Checking build tools…"
+        execute(python,[script.path,"--check-tools"]) { [weak self] code in
+            guard let self else{return};self.preparing=false;self.cancel.isEnabled=false;self.accept([])
+            if self.stopped {self.status.stringValue="Stopped safely. Choose Build / Resume to continue.";return}
+            guard let report=try? JSONDecoder().decode(SetupToolReport.self,from:Data(self.recentOutput.utf8)) else {
+                self.failed(toolDiagnostic(self.recentOutput));return
+            }
+            if !report.missing.isEmpty {
+                self.append("Required build tools: "+report.missing.joined(separator:", ")+"\n")
+                if prepareIfNeeded {self.prepareRequiredTools(then:{self.startBuild(prepareIfNeeded:false)})}
+                else {self.failed(toolDiagnostic("Install the prerequisites: "+report.missing.joined(separator:", ")) ?? SetupDiagnostic(code:"missing-tools",title:"Build tools are still missing",message:report.missing.joined(separator:", "),recovery:"Open Setup Log for the tool preparation output, resolve its reported error, then choose Build / Resume. Verified downloads are kept."))}
+                return
+            }
+            guard code==0,report.mac_toolchain?.ok != false else {self.failed(report.mac_toolchain?.diagnostic ?? toolDiagnostic(self.recentOutput));return}
+            ready()
+        }
+    }
+    @objc func start() {startBuild(prepareIfNeeded:!CommandLine.arguments.contains("--check"))}
+    func startBuild(prepareIfNeeded:Bool) {
         guard let rom,let melee,process==nil else{return};stopped=false;preparing=false
+        installedApp=nil;openInstalled.isHidden=true;showInstalled.isHidden=true
         try? FileManager.default.createDirectory(at:destination,withIntermediateDirectories:true)
         attemptHeader("Build / Resume")
         guard let python=setupPython(destination) ?? setupPython(kit) else {
+            if prepareIfNeeded {prepareRequiredTools(then:{self.startBuild(prepareIfNeeded:false)});return}
             failed(SetupDiagnostic(code:"missing-python",title:"Prepare the Python build tools",message:"Setup needs Python 3.12 or newer with Pillow to build the game.",recovery:"Choose Prepare Build Tools, let it finish, then choose Build / Resume. The finished game does not need Python during gameplay."));return
         }
         do {
             if destination.path.contains(where:{$0.isWhitespace}) {throw NSError(domain:"Setup",code:1,userInfo:[NSLocalizedDescriptionKey:"Choose a build folder without spaces. Game filenames may contain spaces."])}
             try FileManager.default.createDirectory(at:destination,withIntermediateDirectories:true)
             let source=kit.appendingPathComponent("outputs/sm64-melee-lab"),target=destination.appendingPathComponent("outputs/sm64-melee-lab")
-            guard FileManager.default.fileExists(atPath:source.appendingPathComponent("release/Setup.py").path) else {throw NSError(domain:"Setup",code:2,userInfo:[NSLocalizedDescriptionKey:"The complete source kit is missing. Download and extract it again."])}
-            for name in ["native","release","branding"] {
-                let out=target.appendingPathComponent(name);try FileManager.default.createDirectory(at:out,withIntermediateDirectories:true)
-                let copy=Process();copy.executableURL=URL(fileURLWithPath:"/usr/bin/rsync");copy.arguments=["-a","--exclude=dist","--exclude=*.app","--exclude=__pycache__",source.appendingPathComponent(name).path+"/",out.path+"/"]
-                try copy.run();copy.waitUntilExit();if copy.terminationStatus != 0 {throw NSError(domain:"Setup",code:3,userInfo:[NSLocalizedDescriptionKey:"The installer could not copy its source kit into the build folder. Check the folder is writable and the drive has space, then extract the complete release ZIP again if needed."])}
-            }
+            try synchronizeSourceKit(source,to:target)
             var arguments=[target.appendingPathComponent("release/Setup.py").path,"--rom",rom.path,"--melee",melee.path,"--cancel-file",cancelFile.path,"--launch"]
             if CommandLine.arguments.contains("--check"){arguments=Array(arguments.dropLast())+["--check"]}
             try? FileManager.default.removeItem(at:cancelFile)
             try? FileManager.default.removeItem(at:destination.appendingPathComponent("work/setup-error.json"))
-            status.stringValue="Checking your files and available build space…"
-            execute(python,arguments) { [weak self] code in
+            let launchBuild = { [self] in
+                self.preparing=false;self.status.stringValue="Checking your files and available build space…"
+                self.execute(python,arguments) { [weak self] code in
                 guard let self else{return};self.cancel.isEnabled=false;self.accept([])
-                if code==0 {self.status.stringValue="Ready. Super Melee 64 has been built."}
+                if code==0 {
+                    if CommandLine.arguments.contains("--check") {self.status.stringValue="Files and tools checked. No game was installed.";return}
+                    guard self.refreshInstalledApp() else {
+                        self.failed(SetupDiagnostic(code:"mac-app-install",title:"The installed app could not be found",message:"Setup finished without a valid installed app. It has not reported a successful installation.",recovery:"Choose Build / Resume in this installer to retry installing the app into Applications. Verified build outputs are kept."));return
+                    }
+                }
                 else if code==130 || self.stopped {self.status.stringValue="Stopped safely. Choose Build / Resume to continue."}
                 else {self.failed(savedDiagnostic(self.destination.appendingPathComponent("work/setup-error.json")) ?? toolDiagnostic(self.recentOutput))}
+                }
             }
+            if CommandLine.arguments.contains("--check") {launchBuild()}
+            else {checkTools(python,script:target.appendingPathComponent("release/Setup.py"),prepareIfNeeded:prepareIfNeeded,ready:launchBuild)}
         } catch {
             append(error.localizedDescription+"\n");accept([])
             failed(toolDiagnostic(error.localizedDescription) ?? SetupDiagnostic(code:"prepare-folder",title:"The installer could not prepare the build folder",message:error.localizedDescription,recovery:"Check the build folder is writable and the complete release ZIP has been extracted. Choose the same folder to resume verified downloads, or a new empty folder if you want a fresh install."))
         }
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender:NSApplication)->Bool {process==nil}
+}
+if let index=CommandLine.arguments.firstIndex(of:"--installed-app"),index+1<CommandLine.arguments.count {
+    if let app=installedGame(URL(fileURLWithPath:CommandLine.arguments[index+1])) {print(app.path);exit(0)}
+    exit(2)
+}
+if let index=CommandLine.arguments.firstIndex(of:"--sync-source-kit"),index+2<CommandLine.arguments.count {
+    do {try synchronizeSourceKit(URL(fileURLWithPath:CommandLine.arguments[index+1]),to:URL(fileURLWithPath:CommandLine.arguments[index+2]));exit(0)}
+    catch {fputs(error.localizedDescription+"\n",stderr);exit(1)}
 }
 if let index=CommandLine.arguments.firstIndex(of:"--diagnose-output"),index+1<CommandLine.arguments.count {
     let output=(try? String(contentsOfFile:CommandLine.arguments[index+1],encoding:.utf8)) ?? ""

@@ -2,11 +2,12 @@
 """Apply the first host boundary to this chat's isolated SM64 source checkout."""
 from pathlib import Path
 import shutil,re,os
+from build_host import copy_build_source
 HERE=Path(__file__).resolve().parent
 ROOT=HERE.parents[2]
 SOURCE=Path(os.environ.get('SMB_HOST_SOURCE_DIR',str(ROOT/'work/sm64ex-source')))
 for name in ('sm64_air.inc','sm64_air_scenarios.inc','sm64_round_scenarios.inc','sm64_launch_coop.inc','sm64_finish_scenarios.inc','sm64_swim_control_scenarios.inc','sm64_options.inc','bridge_protocol.h','sm64_platform.h','sm64_host_bridge.c','sm64_gl_composite.inc','sm64_combat.inc','sm64_scenarios.inc','sm64_platform_fixture.inc','sm64_interaction_scenarios.inc','sm64_character_select.inc','sm64_npcs.inc','sm64_npc_environment.inc','sm64_npc_water.inc','sm64_campaign.inc','sm64_stage_starts.inc','sm64_video.inc','sm64_record_capture.inc','sm64_recording.m','sm64_app_bootstrap.m','sm64_recording_windows.cpp'):
-    shutil.copy2(HERE/name,SOURCE/'src/pc'/name)
+    copy_build_source(HERE/name,SOURCE/'src/pc'/name)
 
 def edit(path,before,after):
     p=SOURCE/path;s=p.read_text()

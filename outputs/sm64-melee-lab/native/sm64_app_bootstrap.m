@@ -39,8 +39,12 @@ void smb_app_bootstrap(int* argc,char*** argv) {
         }
         NSFileManager* fm=NSFileManager.defaultManager;
         NSString* home=NSHomeDirectory();
+        BOOL smoke=NO;for(int i=1;i<*argc;i++)if(!strcmp((*argv)[i],"--app-smoke"))smoke=YES;
+        const char* smoke_path=getenv("SMB_APP_SMOKE_ROOT");
+        NSString* smoke_root=smoke&&smoke_path&&smoke_path[0]=='/'?@(smoke_path):nil;
         NSString* support=[home stringByAppendingPathComponent:@"Library/Application Support/Super Melee 64"];
         NSString* logs=[home stringByAppendingPathComponent:@"Library/Logs/Super Melee 64"];
+        if(smoke_root){support=[smoke_root stringByAppendingPathComponent:@"Support"];logs=[smoke_root stringByAppendingPathComponent:@"Logs"];}
         NSError* error=nil;
         for(NSString* path in @[support,logs])if(![fm createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:&error])app_fail(error.localizedDescription);
         /* Kernel ownership disappears on exit/crash; stale PID files cannot
@@ -78,6 +82,7 @@ void smb_app_bootstrap(int* argc,char*** argv) {
         NSString* unlocked=[support stringByAppendingPathComponent:@"Unlocked"];
         NSString* recommended=[support stringByAppendingPathComponent:@"Recommended Stages"];
         NSString* recordings=[home stringByAppendingPathComponent:@"Movies/Super Melee 64"];
+        if(smoke_root)recordings=[smoke_root stringByAppendingPathComponent:@"Recordings"];
         app_env("SMB_PROFILE_UNLOCKED",unlocked);app_env("SMB_PROFILE_CONTINUE",continued);
         app_env("SMB_PROFILE_RECOMMENDED",recommended);
         app_env("SMB_PROFILE_NEW",fresh);app_env("SMB_PLAYTHROUGH_LATEST",latest);app_env("SMB_RECORD_DIR",recordings);

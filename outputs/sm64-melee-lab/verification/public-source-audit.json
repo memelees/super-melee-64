@@ -1,13 +1,13 @@
 {
   "passed": true,
-  "current_files_checked": 168,
+  "current_files_checked": 169,
   "tracked_files": 0,
-  "proposed_nonignored_files": 168,
+  "proposed_nonignored_files": 169,
   "history_checked": false,
   "history_commits": 0,
   "commit_actor_and_local_git_metadata_checked": false,
   "historical_blobs_checked": 0,
-  "private_terms_configured": 5,
+  "private_terms_configured": 0,
   "finding_counts": {},
   "findings": [],
   "bootstrap": {

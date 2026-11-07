@@ -17,6 +17,7 @@ sys.path.insert(0,str(NATIVE))
 from build_bootstrap import PIN as ADAPTER_PIN, verify as verify_bootstrap, extract as extract_bootstrap, configure_local_sources
 from package_release import VERSION
 from build_host import MAC_SOUND_TOOLS
+from build_mac_app import application_destination
 BOOTSTRAP=Path(__file__).resolve().parent/'SmashRoyale-bootstrap.zip'
 PINS={'smash-royale':('bundled-source-bootstrap',ADAPTER_PIN),
       'sm64ex-source':('https://github.com/sm64pc/sm64ex.git','d7ca2c04364a6dd0dac58b47151e04e26887e6f0'),
@@ -117,8 +118,10 @@ build()
     run([sys.executable,'-c',code],cwd=upstream/'tools/melee3d')
 
 def create_mac_launcher():
-    run([sys.executable,NATIVE/'build_mac_app.py'])
-    return ROOT/'Super Melee 64.app'
+    target=application_destination()
+    run([sys.executable,NATIVE/'build_mac_app.py','--install','--applications-dir',target.parent])
+    if not (target/'Contents/Info.plist').is_file():raise RuntimeError('The app installation did not create '+str(target))
+    return target
 
 def copy_owned_input(source,target,algorithm,expected):
     if target.exists():
@@ -148,7 +151,7 @@ def main():
     if args.check_tools:
         report=dict(platform=args.platform,missing=preflight(args.platform),filesystem=filesystem_report(ROOT,args.minimum_free_gib))
         if args.platform=='mac' and sys.platform=='darwin':report['mac_toolchain']=mac_toolchain_report()
-        print(json.dumps(report,indent=2));return 0 if report.get('mac_toolchain',{}).get('ok',True) else 2
+        print(json.dumps(report,indent=2));return 0 if not report['missing'] and report.get('mac_toolchain',{}).get('ok',True) else 2
     rom=args.rom.expanduser().resolve() if args.rom else choose('Select your original US Super Mario 64 ROM',[('SM64 ROM','*.z64'),('All files','*')])
     disc=args.melee.expanduser().resolve() if args.melee else choose('Select your original Melee USA Rev 2 disc',[('GameCube disc','*.iso *.gcm'),('All files','*')])
     identities=verify_inputs(rom,disc);missing=preflight(args.platform)
@@ -233,17 +236,18 @@ def install(args,rom,disc,identities,build_env=None):
     disc_path=subprocess.check_output(['wslpath','-w',str(disc)],text=True).strip() if args.platform=='windows' and os.environ.get('WSL_DISTRO_NAME') else str(disc)
     config=dict(platform=args.platform,disc=disc_path,rom=str(rom),upstream=str(upstream),pins=PINS,inputs=identities,version=VERSION)
     (work/'install.json').write_text(json.dumps(config,indent=2)+'\n')
-    SESSION.done();stage(11,'Build the app launcher')
-    if args.platform=='mac':print('Launcher: '+str(create_mac_launcher()))
+    SESSION.done();stage(11,'Build and install the app')
+    if args.platform=='mac':launcher=create_mac_launcher()
     else:
         inputs=work/'game-inputs';inputs.mkdir(exist_ok=True);owned_disc=inputs/'Melee.iso'
         if not owned_disc.exists():copy_owned_input(disc,owned_disc,'md5',MELEE_MD5)
         elif digest(owned_disc,'md5')!=MELEE_MD5:raise RuntimeError('A different existing local disc copy was preserved: '+str(owned_disc))
-        print('Launcher: '+str(create_windows_launcher()))
+        launcher=create_windows_launcher()
+    print('Launcher: '+str(launcher))
     SESSION.done();stage(12,'Complete')
-    print('\nBuilt locally. Use Play Super Melee 64. Windows runtime remains an unverified release candidate.' if args.platform=='windows' else '\nBuilt locally. Use Play Super Melee 64.')
+    print('\nBuilt locally. Use Play Super Melee 64. Windows runtime remains an unverified release candidate.' if args.platform=='windows' else '\nInstalled in Applications: '+str(launcher))
     if args.launch:
-        run(['open',ROOT/'Super Melee 64.app'] if args.platform=='mac' else [ROOT/'Super Melee 64.exe'])
+        run(['open',launcher] if args.platform=='mac' else [launcher])
     SESSION.done()
     return 0
 def entrypoint():

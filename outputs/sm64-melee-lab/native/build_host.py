@@ -7,6 +7,12 @@ MAC_SOUND_TOOLS=('i686-w64-mingw32-as','i686-w64-mingw32-objcopy','i686-w64-ming
 DOWNLOADS={
  'SDL2-devel-2.32.10-mingw.tar.gz':('https://github.com/libsdl-org/SDL/releases/download/release-2.32.10/SDL2-devel-2.32.10-mingw.tar.gz','83a5d74012311edc3c0d40ea6faecbe57ad692aa033fa5dc273cc937e3938ff2'),
  'glew-2.2.0.tgz':('https://github.com/nigels-com/glew/releases/download/glew-2.2.0/glew-2.2.0.tgz','d4fc82893cfb00109578d0a1a2337fb8ca335b3ceccf97b97e5cc7f08e4353e1')}
+def copy_build_source(source,target):
+    """Stage source with a fresh timestamp, including reproducible ZIPs."""
+    source,target=Path(source),Path(target)
+    # copy2 would restore the ZIP's reproducible mtime and let Make reuse a
+    # stale object, including one left by an older installer's partial build.
+    shutil.copyfile(source,target)
 def make_program():
     make=shutil.which('gmake') or (shutil.which('make') if sys.platform!='darwin' else None)
     if not make:
