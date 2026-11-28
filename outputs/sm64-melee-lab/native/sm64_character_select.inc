@@ -19,8 +19,12 @@ void smb_record_menu_update(void);
 #ifdef _WIN32
 #include <direct.h>
 #define mkdir(path,mode) _mkdir(path)
-#define setenv(name,value,overwrite) SDL_setenv(name,value,overwrite)
-#define unsetenv(name) _putenv_s(name,"")
+/* SDL_setenv only updates the Win32 environment block. The CRT getenv() that
+ * the game and the embedded Melee engine read never sees that change, so every
+ * selection made on this screen silently fell back to the launcher's ini.
+ * Write both copies: Win32 for children we spawn, CRT for this process. */
+#define setenv(name,value,overwrite) (SDL_setenv(name,value,overwrite),_putenv_s(name,value))
+#define unsetenv(name) (SDL_setenv(name,"",1),_putenv_s(name,""))
 #endif
 static void smb_select_save_mode(int mode) {
     int stage=getenv("SMB_START_STAGE")?atoi(getenv("SMB_START_STAGE")):-1;
@@ -69,6 +73,7 @@ static GLuint smb_select_texture(unsigned w,unsigned h,FILE* file) {
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
     glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,w,h,0,GL_RGBA,GL_UNSIGNED_BYTE,pixels);free(pixels);return tex;
 }
+#include "sm64_settings.inc"
 static void smb_select_named(SmbSelectCell* cells,const char* name,int* pick,int* sheik) {
     if(!name)return;
     if(!strcmp(name,"sheik")){*pick=19;*sheik=1;return;}
@@ -79,10 +84,12 @@ void smb_host_change_menu_request(void);void smb_host_change_menu_closed(void);
 int smb_host_change_character(unsigned,unsigned,const char*);
 int smb_host_spawn_enemy(unsigned,unsigned,unsigned);
 void smb_gl_menu_begin(void);void smb_gl_menu_end(void);
+int smb_settings_menu_requested(void);void smb_host_settings_closed(void);void smb_host_settings_request(void);
 static void smb_select_costume(int* costume,unsigned count,int direction) {
     if(count)*costume=(*costume+(direction>0?1:(int)count-1))%count;
 }
 static void smb_host_select(SDL_Window* window,int runtime) {
+    if(!runtime)smb_settings_load(window);
 #ifdef __APPLE__
     smb_record_menu_update();
 #endif
@@ -147,6 +154,7 @@ static void smb_host_select(SDL_Window* window,int runtime) {
                     case SDL_SCANCODE_Z:if(cells[pick[slot]].character==18)sheik[slot]=!sheik[slot];break;
                     case SDL_SCANCODE_RETURN:case SDL_SCANCODE_SPACE:done=1;break;
                     case SDL_SCANCODE_ESCAPE:if(runtime){cancel=1;done=1;break;}exit(0);
+                    case SDL_SCANCODE_F10:case SDL_SCANCODE_S:smb_settings_open(window,runtime);break;
                     default:break;
                 }
             }
@@ -155,6 +163,7 @@ static void smb_host_select(SDL_Window* window,int runtime) {
                 for(int i=0;i<32;i++)if(x>=cells[i].x&&x<cells[i].x+cells[i].w&&y>=cells[i].y&&y<cells[i].y+cells[i].h){if(slot==0&&pick[slot]!=i)costume=0;pick[slot]=i;sheik[slot]=0;}
                 for(int i=0;i<(course?1:4);i++)if(x>=40+i*226&&x<252+i*226&&y>=380&&y<640){slot=i;if(i>cpus)cpus=i;}
                 if(!runtime&&course&&y>=492&&y<524){if(x>=290&&x<450)encounter_mode=0;if(x>=466&&x<646)encounter_mode=1;if(x>=662&&x<886)encounter_mode=2;}
+                if(y>=32&&y<70&&x>=752&&x<928)smb_settings_open(window,runtime);
                 if(!runtime&&y>=102&&y<122){for(int i=0;i<3;i++)if(x>=100+i*180&&x<260+i*180){save_mode=i;route=-1;}if(x>=700&&x<920)record=!record;}
                 if(slot==0&&y>=480&&y<540) {
                     if(x>=40&&x<68)smb_select_costume(&costume,cells[pick[0]].costumes,-1);
@@ -190,7 +199,10 @@ static void smb_host_select(SDL_Window* window,int runtime) {
             }
             if(route_move) {
                 route=(route+1+route_move+28)%28-1;
-                if(route>=0){smb_select_named(cells,stage_starts[route].player,&pick[0],&sheik[0]);costume=0;save_mode=0;}
+                /* Changing the stage must not overwrite the fighter that was
+                 * just picked; the stage entry's player is a campaign default,
+                 * not an order to replace the selection. */
+                if(route>=0){costume=0;save_mode=0;}
             }
             if(move){if(slot==0)costume=0;pick[slot]=(pick[slot]+move)%32;sheik[slot]=0;}
         }
@@ -254,6 +266,10 @@ static void smb_host_select(SDL_Window* window,int runtime) {
         }
         smb_select_rect(699,102,222,21,record?.9f:.18f,record?.2f:.22f,.25f,1);smb_select_rect(700,103,220,19,.08f,.1f,.16f,1);
         smb_select_sprite(atlas,708,103,200,19,0,2096+record*32,300,30,512,4096);
+        smb_select_rect(752,32,176,38,.06f,.08f,.12f,.94f);
+        smb_select_rect(752,32,176,2,1,.75f,.2f,1);smb_select_rect(752,68,176,2,1,.75f,.2f,1);
+        smb_select_rect(752,32,2,38,1,.75f,.2f,1);smb_select_rect(926,32,2,38,1,.75f,.2f,1);
+        smb_settings_text(768,44,"SETTINGS",1.5f,1,.86f,.45f,1);
         if(runtime) {
             smb_select_rect(30,100,900,23,.06f,.08f,.13f,1);
             smb_select_rect(30,642,900,78,.06f,.08f,.13f,1);

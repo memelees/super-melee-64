@@ -416,7 +416,7 @@ static void smb_render_hud(const SmbRender* request) {
     smb_draw_lives_icon((float)request->width/request->height);HSD_GObj_804D7814=previous;
 }
 int smb_embed_render(const SmbRender* request,float* color,float* depth,unsigned char* transmission) {
-    if(!ready||!request||!color||!depth)return -1;
+    if(!ready||!request||!color)return -1;
     smb_native_powerups();
     if(smb_gpu_begin(request->width,request->height))return -2;
     smb_native_rendering=1;

@@ -8,6 +8,7 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import re
 
@@ -81,12 +82,42 @@ def quiet_children():
     subprocess.Popen = QuietProcess
 
 
-def publish_ui(data, label, progress=0):
+STATUS_LOCK = threading.Lock()
+STATUS = dict(data=None, label='Starting setup', progress=0, changed=0.0)
+STATUS_STOP = threading.Event()
+
+
+def write_status(data, label, progress):
     # Plain UTF-8 keeps the Win32 frontend independent of a JSON dependency.
     path = Path(data) / 'setup-ui.status'
     temporary = path.with_suffix('.tmp')
     temporary.write_text(str(progress) + '\n' + label.replace('\n', ' ') + '\n', encoding='utf-8')
     temporary.replace(path)
+
+
+def publish_ui(data, label, progress=0):
+    with STATUS_LOCK:
+        STATUS.update(data=Path(data), label=label, progress=progress, changed=time.monotonic())
+        write_status(data, label, progress)
+
+
+def start_status_heartbeat(interval=15):
+    """A long silent step (disc patching, a compiler) must not look like a stall."""
+    def tick():
+        while not STATUS_STOP.wait(interval):
+            with STATUS_LOCK:
+                data = STATUS['data']
+                if data is None or STATUS['progress'] >= 100:
+                    continue
+                minutes, seconds = divmod(int(time.monotonic() - STATUS['changed']), 60)
+                label = '%s (still working, %d:%02d)' % (STATUS['label'], minutes, seconds)
+                try:
+                    write_status(data, label, STATUS['progress'])
+                except OSError:
+                    pass  # The frontend may be closing; never interrupt the build.
+    thread = threading.Thread(target=tick, name='setup-status', daemon=True)
+    thread.start()
+    return thread
 
 
 def load_setup(workspace):
@@ -119,6 +150,7 @@ def install(args):
     data = (args.data or data_directory()).resolve()
     package = args.package.resolve()
     data.mkdir(parents=True, exist_ok=True)
+    start_status_heartbeat()
     cancel = data / 'setup.cancel'
     cancel.unlink(missing_ok=True)
     lock = data / 'setup.lock'
@@ -221,6 +253,7 @@ def install(args):
             publish_ui(data, 'Super Melee 64 is ready to play.', 100)
             return 0
     finally:
+        STATUS_STOP.set()
         lock.unlink(missing_ok=True)
         os.environ.pop('SMB_WINDOWS_BUILD_ROOT', None)
 

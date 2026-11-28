@@ -67,6 +67,11 @@ int smb_host_spawn_round(void);
 static unsigned character_changed_at;
 void smb_host_spawn_menu_request(void){if(embedded_step)character_menu_requested=2;}
 void smb_host_change_menu_request(void){if(embedded_step)character_menu_requested=1;}
+/* Settings live in the gfx layer; this flag is all the host loop needs. */
+static int settings_menu_requested;
+void smb_host_settings_request(void){settings_menu_requested=1;}
+int smb_settings_menu_requested(void){return settings_menu_requested;}
+void smb_host_settings_closed(void){settings_menu_requested=0;}
 void smb_host_cannon_fired(struct MarioState* m) {
     if(!embedded_step)return;
     memcpy(cannon_position,m->pos,sizeof cannon_position);
@@ -134,6 +139,7 @@ void smb_host_key(int code,int down) {
     if(code==SDL_SCANCODE_F7&&down&&!host_keys[code])character_menu_requested=2;
     if(code==SDL_SCANCODE_F10&&down&&!host_keys[code])smb_host_option(0,1);
     if(code==SDL_SCANCODE_F6&&down&&!host_keys[code])smb_host_change_menu_request();
+    if(code==SDL_SCANCODE_F11&&down&&!host_keys[code])smb_host_settings_request();
     if(code==SDL_SCANCODE_F9&&down&&!host_keys[code]) {
         smb_record_toggle();
     }
@@ -142,6 +148,7 @@ void smb_host_key(int code,int down) {
 void smb_host_controller_look(float x,float y){controller_look[0]=fabsf(x)>.22f?x:0;controller_look[1]=fabsf(y)>.22f?y:0;}
 static void smb_combat_camera_update(struct Camera*);
 static float combat_zoom,combat_lift;
+static unsigned castle_cam_hold;
 static int melee_camera_enabled(void){return getenv("SMB_CAMERA")&&!strcmp(getenv("SMB_CAMERA"),"melee");}
 float smb_host_camera_distance(float distance) {
     float preferred=embedded_step&&!melee_camera_enabled()?distance*(1.25f+combat_zoom):distance;
@@ -152,6 +159,27 @@ float smb_host_camera_distance(float distance) {
     return preferred;
 }
 int smb_host_camera(struct Camera* c) {
+    /* Entering the castle normally shows a raised three-quarter view of the
+     * hall. The stage warp skips that framing, so hold it briefly at the
+     * landing and release it the moment the player steers. */
+    if(castle_cam_hold&&embedded_step&&!melee_camera_enabled()&&c&&!c->cutscene&&gMarioState) {
+        struct MarioState* m=gMarioState;
+        int moved=(gPlayer1Controller&&(fabsf(gPlayer1Controller->stickX)>.35f||fabsf(gPlayer1Controller->stickY)>.35f))||controller_buttons||
+            host_keys[SDL_SCANCODE_W]||host_keys[SDL_SCANCODE_A]||host_keys[SDL_SCANCODE_S]||host_keys[SDL_SCANCODE_D]||
+            host_keys[SDL_SCANCODE_UP]||host_keys[SDL_SCANCODE_DOWN]||host_keys[SDL_SCANCODE_LEFT]||host_keys[SDL_SCANCODE_RIGHT];
+        if(moved||!--castle_cam_hold)castle_cam_hold=0;
+        else {
+            /* Camera in front of the fighter inside the hall, looking diagonally
+             * down at him with the entrance doors behind him. */
+            s16 yaw=(s16)0x8000;
+            c->yaw=c->nextYaw=yaw;
+            c->pos[0]=m->pos[0];c->pos[1]=m->pos[1]+320.f;c->pos[2]=m->pos[2]-400.f;
+            c->focus[0]=m->pos[0];c->focus[1]=m->pos[1]+75.f;c->focus[2]=m->pos[2]+80.f;
+            vec3f_copy(gLakituState.pos,c->pos);vec3f_copy(gLakituState.curPos,c->pos);vec3f_copy(gLakituState.goalPos,c->pos);
+            vec3f_copy(gLakituState.focus,c->focus);vec3f_copy(gLakituState.curFocus,c->focus);vec3f_copy(gLakituState.goalFocus,c->focus);
+            return 1;
+        }
+    }
     if(embedded_step&&!melee_camera_enabled()) {
         /* C-up is a persistent Mario action; native combat bypasses its exit
          * handler. Use a bounded, momentary look instead, including D-pad. */
@@ -300,16 +328,38 @@ void smb_host_shutdown(void) {
     if(embedded_shutdown) {embedded_shutdown();embedded_shutdown=NULL;}
 }
 static void* smb_native_stack;static size_t smb_native_stack_size;
+static void* smb_embedded_handle;
+static unsigned long long smb_perf_us(void){return (unsigned long long)(SDL_GetPerformanceCounter()*(1000000.0/(double)SDL_GetPerformanceFrequency()));}
+static unsigned long long smb_perf_step_us,smb_perf_render_us,smb_perf_hud_us,smb_perf_samples;
+static unsigned smb_perf_render_calls,smb_perf_hud_calls;
+static unsigned long long smb_perf_guest_us,smb_perf_comp_us;
+/* The guest encodes pointers against a guard window at 0x80000000. Reserve it
+ * before the picker and the graphics stack hand out low addresses: once any of
+ * it is taken the guest refuses to boot (win32 error 487 at m3d_guest_init). */
+static void smb_host_reserve_guest_window(void) {
+#ifdef _WIN32
+    const char* library=getenv("SM64_MELEE_LIBRARY");if(!library)return;
+    Uint64 started=SDL_GetTicks64();
+    void* handle=dlopen(library,RTLD_NOW|RTLD_LOCAL);
+    if(!handle){fprintf(stderr,"SMB HOST FAIL dlopen: %s\n",dlerror());return;}
+    void (*guest_init)(void)=(void(*)(void))dlsym(handle,"m3d_guest_init");
+    if(!guest_init){fprintf(stderr,"SMB GUEST WINDOW no m3d_guest_init\n");return;}
+    guest_init();smb_embedded_handle=handle;
+    fprintf(stderr,"SMB GUEST WINDOW reserved early elapsed_ms=%llu\n",(unsigned long long)(SDL_GetTicks64()-started));
+#endif
+}
 void smb_host_initialize(void* native_stack,size_t native_stack_size) {
     smb_native_stack=native_stack;smb_native_stack_size=native_stack_size;
-    if(getenv("SM64_MELEE_LIBRARY")){atexit(smb_host_release_session);atexit(smb_record_stop);}
+    if(getenv("SM64_MELEE_LIBRARY")){atexit(smb_host_release_session);atexit(smb_record_stop);smb_host_reserve_guest_window();}
 }
 void smb_host_boot(void) {
     smb_host_options_load();
     if(embedded_step)return;
     const char* library=getenv("SM64_MELEE_LIBRARY");if(!library)return;
-    void* handle=dlopen(library,RTLD_NOW|RTLD_LOCAL);
+    Uint64 boot_started=SDL_GetTicks64();
+    void* handle=smb_embedded_handle?smb_embedded_handle:dlopen(library,RTLD_NOW|RTLD_LOCAL);
     if(!handle){fprintf(stderr,"SMB HOST FAIL dlopen: %s\n",dlerror());exit(2);}
+    smb_embedded_handle=handle;
     int (*init)(uint32_t,const char*,void*,size_t)=dlsym(handle,"smb_embed_init");
     embedded_step=dlsym(handle,"smb_embed_step");
     embedded_switch=dlsym(handle,"smb_embed_switch");
@@ -346,6 +396,7 @@ void smb_host_boot(void) {
     void (*audio_sink)(void(*)(const float*,unsigned))=dlsym(handle,"smb_embed_audio_sink");
     if(audio_sink)audio_sink(smb_record_melee_audio);
     fprintf(stderr,"SMB HOST EMBEDDED pid=%d transport=direct-call\n",getpid());
+    fprintf(stderr,"SMB PERF boot guest_init_ms=%llu\n",(unsigned long long)(SDL_GetTicks64()-boot_started));
     /* Keep the library loaded for process lifetime: its engine owns workers
      * and its registered shutdown must run before C++ static destructors. */
 }
@@ -596,7 +647,7 @@ int smb_host_frame(struct MarioState* m) {
     if(!route_checked&&embedded_step) {
         route_checked=1;int stage=getenv("SMB_START_STAGE")?atoi(getenv("SMB_START_STAGE")):-1;
         if(stage>=0&&stage<27) {
-            const SmbStageStart* start=&stage_starts[stage];route_landing=stage==23;
+            const SmbStageStart* start=&stage_starts[stage];route_landing=stage==23||stage==1;
             extern void initiate_warp(s16,s16,s16,s32);
             gCurrActNum=gDialogCourseActNum=1;
             if(gCurrLevelNum!=(int)start->level){initiate_warp(start->level,start->area,start->node,0);active=0;return 0;}
@@ -609,6 +660,32 @@ int smb_host_frame(struct MarioState* m) {
             memset(m->vel,0,sizeof m->vel);m->forwardVel=0;set_mario_action(m,ACT_FREEFALL,0);active=0;
             route_landing=0;fprintf(stderr,"SMB STAGE PLATFORM level=%d x=350 y=%.1f z=0\n",gCurrLevelNum,y);
         }
+    }
+    /* The castle's warp node points at the front door with the camera outside
+     * looking in. Place the fighter centered in front of the double doors
+     * facing them, and frame the camera behind and above him in the hall. */
+    if(route_landing&&gCurrLevelNum==LEVEL_CASTLE) {
+        fprintf(stderr,"SMB STAGE DOORMAT pre level=%d x=%.1f y=%.1f z=%.1f yaw=%d camyaw=%d cam=%.0f,%.0f,%.0f\n",gCurrLevelNum,m->pos[0],m->pos[1],m->pos[2],m->faceAngle[1],gCamera?gCamera->yaw:0,gCamera?gCamera->pos[0]:0.0f,gCamera?gCamera->pos[1]:0.0f,gCamera?gCamera->pos[2]:0.0f);
+        struct Surface* floor=NULL;float x=-1023.0f,z=1960.0f;float y=find_floor(x,20000,z,&floor);
+        if(floor&&floor->type!=SURFACE_WARP&&floor->type!=SURFACE_DEATH_PLANE) {
+            m->pos[0]=x;m->pos[1]=y+2;m->pos[2]=z;m->floor=floor;m->floorHeight=y;
+            memset(m->vel,0,sizeof m->vel);m->forwardVel=0;set_mario_action(m,ACT_FREEFALL,0);active=0;
+        }
+        m->faceAngle[1]=0x8000;
+        /* The warp kept the castle-entrance fixed camera, which framed the door
+         * from the street side. Drop it and start the ordinary follow camera
+         * behind the fighter's new facing. */
+        {struct Camera* cam=gCamera?gCamera:(gCurrentArea?gCurrentArea->camera:NULL);
+         if(cam){s16 yaw=(s16)0x8000;
+                 cam->cutscene=0;set_camera_mode(cam,CAMERA_MODE_FREE_ROAM,1);
+                 cam->yaw=cam->nextYaw=yaw;
+                 cam->pos[0]=m->pos[0];cam->pos[1]=m->pos[1]+320.f;cam->pos[2]=m->pos[2]-400.f;
+                 cam->focus[0]=m->pos[0];cam->focus[1]=m->pos[1]+75.f;cam->focus[2]=m->pos[2]+80.f;
+                 vec3f_copy(gLakituState.pos,cam->pos);vec3f_copy(gLakituState.curPos,cam->pos);vec3f_copy(gLakituState.goalPos,cam->pos);
+                 vec3f_copy(gLakituState.focus,cam->focus);vec3f_copy(gLakituState.curFocus,cam->focus);vec3f_copy(gLakituState.goalFocus,cam->focus);}
+         castle_cam_hold=900;}
+        route_landing=0;
+        fprintf(stderr,"SMB STAGE DOORMAT level=%d x=%.1f y=%.1f z=%.1f yaw=%d\n",gCurrLevelNum,m->pos[0],m->pos[1],m->pos[2],m->faceAngle[1]);
     }
     recording_scene_ready=1;
     if(embedded_powerups)embedded_powerups(((m->flags&MARIO_METAL_CAP)?1:0)|((m->flags&MARIO_VANISH_CAP)?2:0));
@@ -823,7 +900,9 @@ int smb_host_frame(struct MarioState* m) {
     for(int step=0;step<2;step++) {
         cmd.sequence=++sequence;
         if(embedded_step) {
-            if(embedded_step(&cmd,&snapshot)){fprintf(stderr,"SMB HOST FAIL embedded step\n");exit(2);}
+            unsigned long long step_began=smb_perf_us();
+    if(embedded_step(&cmd,&snapshot)){fprintf(stderr,"SMB HOST FAIL embedded step\n");exit(2);}
+    smb_perf_step_us+=smb_perf_us()-step_began;smb_perf_samples++;
         } else {io_full(&cmd,sizeof cmd,1);io_full(&snapshot,sizeof snapshot,0);}
         if(snapshot.magic!=SMB_MAGIC||snapshot.sequence!=sequence||snapshot.bones>SMB_BONES)exit(2);
         if(embedded_step&&snapshot.reserved!=sequence) {
@@ -874,15 +953,28 @@ int smb_host_frame(struct MarioState* m) {
     else if(pound_air&&snapshot.vy<0)m->action=ACT_GROUND_POUND;
     if(!snapshot.grounded&&!(snapshot.abilities&SMB_DOWN_ATTACK)&&!(snapshot.motion>=29&&snapshot.motion<=40))pound_air=0;
     if(getenv("SMB_SCENARIO")&&!strcmp(getenv("SMB_SCENARIO"),"no-fast-fall"))fprintf(stderr,"SMB NO FASTFALL phase=%u tick=%u y=%.6f vy=%.6f fast=%u\n",frames/100,frames%100,snapshot.y,snapshot.vy,!!(snapshot.abilities&4));
-    m->faceAngle[1]=atan2s(snapshot.facing[2],snapshot.facing[0]);
+    m->faceAngle[1]=castle_cam_hold&&gCurrLevelNum==LEVEL_CASTLE?(s16)0x8000:atan2s(snapshot.facing[2],snapshot.facing[0]);
     m->marioObj->header.gfx.angle[1]=m->faceAngle[1];
     if(snapshot.grab_active)m->actionArg=0;
     m->flags&=~(MARIO_PUNCHING|MARIO_KICKING);
     /* Native capsule intersections already apply world attack messages. */
     m->marioObj->header.gfx.pos[0]=p[0];m->marioObj->header.gfx.pos[1]=p[1];m->marioObj->header.gfx.pos[2]=p[2];
+    {
+        /* Frame pacing telemetry: one line every 180 bridge ticks. */
+        static Uint64 perf_prev;static unsigned perf_frames;static double perf_sum,perf_worst;
+        Uint64 now=SDL_GetTicks64();
+        if(perf_prev){double ms=(double)(now-perf_prev);if(ms>=0&&ms<10000){perf_sum+=ms;perf_frames++;if(ms>perf_worst)perf_worst=ms;}}
+        perf_prev=now;
+        if(perf_frames>=180){double avg=perf_sum/perf_frames;
+            double samples=smb_perf_samples?smb_perf_samples:1;
+            double wall=perf_sum*1000.0,rcalls=smb_perf_render_calls?smb_perf_render_calls:1,hcalls=smb_perf_hud_calls?smb_perf_hud_calls:1;
+            fprintf(stderr,"SMB PERF frames=%u window=%u ticks=%llu calls=%u/%u fps=%.2f avg_ms=%.2f worst_ms=%.2f step_ms=%.2f render_ms=%.2f hud_ms=%.2f share_step=%.1f share_render=%.1f share_hud=%.1f level=%d action=%08x\n",frames,perf_frames,smb_perf_samples,smb_perf_render_calls,smb_perf_hud_calls,avg>0?1000.0/avg:0.0,avg,perf_worst,smb_perf_step_us/(1000.0*samples),smb_perf_render_us/(1000.0*rcalls),smb_perf_hud_us/(1000.0*hcalls),wall>0?100.0*smb_perf_step_us/wall:0.0,wall>0?100.0*smb_perf_render_us/wall:0.0,wall>0?100.0*smb_perf_hud_us/wall:0.0,gCurrLevelNum,m->action);
+            perf_frames=0;perf_sum=0;perf_worst=0;smb_perf_step_us=smb_perf_render_us=smb_perf_hud_us=smb_perf_samples=0;smb_perf_render_calls=smb_perf_hud_calls=0;}
+    }
     if(frames++%30==0||(getenv("SMB_SCENARIO")&&(!strcmp(getenv("SMB_SCENARIO"),"ledges")||!strcmp(getenv("SMB_SCENARIO"),"walls")))||last_motion!=snapshot.motion||last_hitboxes!=snapshot.hitboxes) {
-        fprintf(stderr,"SMB HOST FRAME frame=%u kind=%u motion=%u bones=%u x=%.2f y=%.2f z=%.2f hitboxes=%u grounded=%u coins=%d stars=%d level=%d\n",
-                frames,snapshot.kind,snapshot.motion,snapshot.bones,p[0],p[1],p[2],snapshot.hitboxes,snapshot.grounded,m->numCoins,m->numStars,gCurrLevelNum);
+        fprintf(stderr,"SMB HOST FRAME frame=%u kind=%u motion=%u bones=%u x=%.2f y=%.2f z=%.2f hitboxes=%u grounded=%u coins=%d stars=%d level=%d action=%08x face=%d camyaw=%d camx=%.0f camy=%.0f camz=%.0f\n",
+                frames,snapshot.kind,snapshot.motion,snapshot.bones,p[0],p[1],p[2],snapshot.hitboxes,snapshot.grounded,m->numCoins,m->numStars,gCurrLevelNum,m->action,
+                m->faceAngle[1],gCamera?gCamera->yaw:0,gCamera?gCamera->pos[0]:0.0f,gCamera?gCamera->pos[1]:0.0f,gCamera?gCamera->pos[2]:0.0f);
         fflush(stderr);
     }
     last_motion=snapshot.motion;last_hitboxes=snapshot.hitboxes;
@@ -936,7 +1028,9 @@ void smb_host_title_frame(unsigned w,unsigned h,float yaw) {
     request.projection[0]=f*h/w;request.projection[2]=0;request.projection[5]=f;
     /* GX eye-space depth spans -1..0; Aurora performs its device conversion. */
     request.projection[10]=-clipNear/(clipFar-clipNear);request.projection[11]=-clipFar*clipNear/(clipFar-clipNear);request.projection[14]=-1;
-    if(embedded_render(&request,color,depth,transmission)){fprintf(stderr,"SMB HOST FAIL title render\n");exit(2);}
+    {int rc=embedded_render(&request,color,depth,transmission);
+     if(rc==1)return;
+     if(rc){fprintf(stderr,"SMB HOST FAIL title render\n");exit(2);}}
     static unsigned title_frame;if(++title_frame==21){unsigned pixels=0;for(unsigned i=0;i<w*h;i++)if(fabsf(color[i*4])+fabsf(color[i*4+1])+fabsf(color[i*4+2])>.05f)pixels++;fprintf(stderr,"SMB TITLE FIGHTER pixels=%u\n",pixels);}
     smb_gl_composite(color,depth,transmission,w,h,1);
 }
@@ -944,12 +1038,16 @@ static SmbRender smb_hud_request;
 static int smb_hud_pending;
 void smb_host_render_native(const float* view,const float* projection,unsigned width,unsigned height,float aspect) {
     if(!embedded_render||!gMarioState||host_dead)return;
+    /* Measurement switch: isolates the SM64 frame cost from the guest passes. */
+    if(getenv("SMB_SKIP_GUEST_WORLD"))return;
     /* Match the actual SM64 framebuffer, including Retina pixels. */
     unsigned w=width,h=height;
     static unsigned capacity;static float* rgba;static float* depth;static unsigned char* transmission;
     if(w*h>capacity){capacity=w*h;rgba=realloc(rgba,capacity*16);depth=realloc(depth,capacity*4);transmission=realloc(transmission,capacity*4);if(!rgba||!depth||!transmission)exit(2);}
     SmbRender request={0};request.width=w;request.height=h;
-    request.flags=active?((gMarioState->action==ACT_FLYING||(gMarioState->action&ACT_FLAG_RIDING_SHELL))?1:0):5;request.yaw=gMarioState->faceAngle[1]*(6.28318530718f/65536.f);
+    request.flags=active?((gMarioState->action==ACT_FLYING||(gMarioState->action&ACT_FLAG_RIDING_SHELL))?1:0):5;
+    if(castle_cam_hold&&gCurrLevelNum==LEVEL_CASTLE)request.flags|=1;
+    request.yaw=gMarioState->faceAngle[1]*(6.28318530718f/65536.f);
     for(int axis=0;axis<3;axis++)request.position[axis]=gMarioState->pos[axis]*.1f;
     for(int row=0;row<3;row++)for(int col=0;col<4;col++)request.view[row*4+col]=view[col*4+row]*(col==3?.1f:1);
     for(int row=0;row<4;row++)for(int col=0;col<4;col++)request.projection[row*4+col]=projection[col*4+row];
@@ -965,8 +1063,10 @@ void smb_host_render_native(const float* view,const float* projection,unsigned w
         for(int row=0;row<4;row++)for(int col=0;col<4;col++)clip[row]+=request.projection[row*4+col]*eye[col];
         fprintf(stderr,"SMB RENDER CAMERA eye=%.3f,%.3f,%.3f ndc=%.5f,%.5f,%.5f p=%.5f,%.5f\n",eye[0],eye[1],eye[2],clip[0]/clip[3],clip[1]/clip[3],clip[2]/clip[3],request.projection[10],request.projection[11]);
     }
+    unsigned long long render_began=smb_perf_us();
     if(embedded_render(&request,rgba,depth,transmission)){fprintf(stderr,"SMB HOST FAIL native render\n");exit(2);}
     smb_gl_composite(rgba,depth,transmission,w,h,0);
+    smb_perf_render_us+=smb_perf_us()-render_began;smb_perf_render_calls++;
     smb_hud_request=request;smb_hud_request.flags=2|(request.flags&4);smb_hud_pending=1;
     static unsigned portrait_frames;
     if(0&&++portrait_frames==90) {
@@ -1000,10 +1100,28 @@ void smb_host_render_native(const float* view,const float* projection,unsigned w
 /* Called after every SM64 world/HUD display list, including translucent scenery. */
 void smb_host_render_hud(void) {
     if(!smb_hud_pending||!embedded_render)return;smb_hud_pending=0;
+    if(getenv("SMB_SKIP_GUEST_HUD"))return;
     unsigned w=smb_hud_request.width,h=smb_hud_request.height;
     static unsigned capacity;static float *color,*depth;static unsigned char* transmission;
     if(w*h>capacity){capacity=w*h;color=realloc(color,capacity*16);depth=realloc(depth,capacity*4);transmission=realloc(transmission,capacity*4);if(!color||!depth||!transmission)exit(2);}
+    /* The overlay pass re-renders the entire scene a second time just to
+     * isolate the HUD layer: ~27 ms of a 34 ms frame. Its content only moves
+     * when damage, stocks or the timer do, so render it on a bounded interval
+     * and re-composite the previous layer in between instead. */
+    static float* cache_color;static unsigned char* cache_transmission;
+    static unsigned cache_capacity,cache_w,cache_h;static unsigned long long cache_us;static int cache_valid;
+    if(w*h>cache_capacity){cache_capacity=w*h;cache_color=realloc(cache_color,(size_t)cache_capacity*16);cache_transmission=realloc(cache_transmission,(size_t)cache_capacity*4);if(!cache_color||!cache_transmission)exit(2);}
+    unsigned long long hud_now=smb_perf_us();
+    unsigned interval_ms=getenv("SMB_HUD_INTERVAL_MS")?(unsigned)atoi(getenv("SMB_HUD_INTERVAL_MS")):100;
+    if(cache_valid&&interval_ms>1&&w==cache_w&&h==cache_h&&hud_now-cache_us<(unsigned long long)interval_ms*1000ull) {
+        smb_gl_composite(cache_color,NULL,cache_transmission,w,h,1);
+        smb_perf_hud_us+=smb_perf_us()-hud_now;smb_perf_hud_calls++;
+        return;
+    }
+    unsigned long long hud_began=hud_now;
     if(embedded_render(&smb_hud_request,color,depth,transmission)){fprintf(stderr,"SMB HOST FAIL HUD render\n");exit(2);}
+    smb_perf_hud_us+=smb_perf_us()-hud_began;smb_perf_hud_calls++;
+    if(interval_ms>1){memcpy(cache_color,color,(size_t)w*h*16);memcpy(cache_transmission,transmission,(size_t)w*h*4);cache_w=w;cache_h=h;cache_us=smb_perf_us();cache_valid=1;}
     int probe=getenv("SMB_HUD_OCCLUSION_PROBE")&&frames==90;
     float* background=NULL;float depth_before=0,depth_after=0;
     if(probe) {

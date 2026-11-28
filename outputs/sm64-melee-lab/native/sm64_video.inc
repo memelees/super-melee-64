@@ -9,8 +9,21 @@ static unsigned smb_video_samples;
 static int smb_video_compare(const void* a,const void* b){double x=*(const double*)a,y=*(const double*)b;return (x>y)-(x<y);}
 static void smb_video_dimensions(SDL_Window* window,int* w,int* h) {
     SDL_GL_GetDrawableSize(window,w,h);
+    /* Both engines render into this framebuffer and the guest re-renders for
+     * its HUD overlay, so fill rate is paid twice. SMB_RENDER_SCALE trades
+     * sharpness for frame rate: 1.0 native, 0.75 ~1.8x, 0.5 ~3x the pixels. */
+    double scale=getenv("SMB_RENDER_SCALE")?atof(getenv("SMB_RENDER_SCALE")):1.0;
+    if(scale>=0.25&&scale<1.0&&*h>0){*w=(int)(*w*scale+0.5);*h=(int)(*h*scale+0.5);if(*w<1)*w=1;if(*h<1)*h=1;}
     int limit=getenv("SMB_RENDER_MAX_HEIGHT")?atoi(getenv("SMB_RENDER_MAX_HEIGHT")):1080;
     if(limit>0&&*h>limit){*w=(int)((double)*w*limit/(*h));*h=limit;}
+    /* Supersampling: render the whole shared target above the output size and
+     * let the present blit resolve it with GL_LINEAR. 1 off, 2 and 4 enabled. */
+    int ssaa=getenv("SMB_SSAA")?atoi(getenv("SMB_SSAA")):1;
+    if(ssaa>1&&*h>0) {
+        *w*=ssaa;*h*=ssaa;
+        if(*w>8192)*w=8192;if(*h>8192)*h=8192;
+        if(*w<1)*w=1;if(*h<1)*h=1;
+    }
 }
 static void smb_video_start(SDL_Window* window) {
     if(!getenv("SM64_MELEE_LIBRARY"))return;
@@ -25,7 +38,7 @@ static void smb_video_start(SDL_Window* window) {
         glFramebufferRenderbuffer(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_RENDERBUFFER,smb_video_depth);
         glBindRenderbuffer(GL_RENDERBUFFER,0);
         if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE){fprintf(stderr,"SMB VIDEO FAIL framebuffer\n");exit(2);}
-        fprintf(stderr,"SMB VIDEO resolution=%dx%d both_engines=1 target_hz=30 native_hz=60\n",w,h);
+        fprintf(stderr,"SMB VIDEO resolution=%dx%d both_engines=1 target_hz=30 native_hz=60 ssaa=%d\n",w,h,getenv("SMB_SSAA")?atoi(getenv("SMB_SSAA")):1);
     }
     if(!smb_video_begin)smb_video_begin=SDL_GetPerformanceCounter();
 }

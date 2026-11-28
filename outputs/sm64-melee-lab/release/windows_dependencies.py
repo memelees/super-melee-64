@@ -75,6 +75,13 @@ def safe_member(name):
     return path
 
 
+def listing_member(name):
+    # 7-Zip prints members with the platform separator. Validate the same
+    # archive-relative path that the extractor will write, so a drive letter,
+    # rooted path or ".." is still refused after normalisation.
+    return safe_member(name.replace('\\', '/'))
+
+
 def unzip(archive, target):
     with zipfile.ZipFile(archive) as source:
         if sum(item.file_size for item in source.infolist()) > 3 * 1024**3:
@@ -112,7 +119,7 @@ def unpack(name, archive, tools, sevenzip, run=subprocess.run):
             for record in listing.split('----------\n')[-1].split('\n\n'):
                 fields = dict(line.split(' = ', 1) for line in record.splitlines() if ' = ' in line)
                 if 'Path' in fields:
-                    safe_member(fields['Path'])
+                    listing_member(fields['Path'])
                 if any(key in fields for key in ('Symbolic Link', 'Hard Link', 'Reparse')):
                     raise ValueError('Linked Windows tool archive member')
             run([str(sevenzip), 'x', '-y', '-o' + str(staged), str(archive)], check=True)

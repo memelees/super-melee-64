@@ -8,6 +8,13 @@ from pathlib import Path
 import argparse,hashlib,json,subprocess,sys,time
 from setup_support import checkout_pinned
 
+PROGRESS_STEPS=5
+
+def announce(number,label):
+    # Same "[n/m]" shape the Windows frontend already turns into progress, so a
+    # long silent preparation still shows what the installer is doing.
+    print('[%d/%d] %s'%(number,PROGRESS_STEPS,label),flush=True)
+
 PATCHES=(
     ('akaneia','https://github.com/akaneia/akaneia-build/releases/download/1.0.1/Akaneia.Builder.1.0.1.7z',
      '7d46ce47b27272a369150cb105f4cb3b046b2e7790d233595ff4537ef442919f',246177787),
@@ -86,17 +93,21 @@ def main():
     import prepare_native_inputs as inputs
     from native_compatibility import ROOT,WORK,SOURCES
     destinations={'akaneia':ROOT/'build/akaneia/Akaneia.Builder.1.0.1.7z','reference':ROOT/'build/references/Melee3D.v1.0.zip'}
-    for name,url,expected,size in PATCHES:download_pinned(url,destinations[name],expected,size)
+    for number,(name,url,expected,size) in enumerate(PATCHES,1):
+        announce(number,'Download official patch: '+name)
+        download_pinned(url,destinations[name],expected,size)
     # Retain all bundled image, payload and executable checks; only network and
     # checkout preparation are handled by this resumable installer wrapper.
     sys.argv=[str(adapter/'tools/melee3d/prepare_native_inputs.py'),'--melee',str(args.melee.resolve())]
+    announce(3,'Extract and verify your local Melee assets')
     if prepared_inputs(adapter):print('Verified prepared local game assets; no full-image patching needed.',flush=True)
     else:
         inputs.main()
         prepared_inputs(adapter,write=True)
     def run(command):subprocess.run([str(x) for x in command],check=True)
-    for name in ('melee-pc','gd-melee'):
+    for number,name in enumerate(('melee-pc','gd-melee'),4):
         repository,_,revision=SOURCES[name]
+        announce(number,'Fetch pinned native source: '+name)
         checkout_pinned('https://github.com/'+repository+'.git',revision,WORK/name,run)
     print('Verified local game assets and pinned native source dependencies are ready.',flush=True)
 

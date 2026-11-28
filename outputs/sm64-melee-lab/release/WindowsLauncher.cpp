@@ -94,7 +94,13 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int) {
     }
     SECURITY_ATTRIBUTES inherit{sizeof(SECURITY_ATTRIBUTES),nullptr,TRUE};
     HANDLE output=CreateFileW((support+L"/latest-host.log").c_str(),GENERIC_WRITE,FILE_SHARE_READ,&inherit,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,nullptr);
+    DWORD logError=GetLastError();
     HANDLE input=CreateFileW(L"NUL",GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE,&inherit,OPEN_EXISTING,0,nullptr);
+    if(output==INVALID_HANDLE_VALUE&&logError==ERROR_SHARING_VIOLATION) {
+        // A running game keeps this log open. Starting twice is not a save-folder fault.
+        if(input!=INVALID_HANDLE_VALUE)CloseHandle(input);
+        fail(L"Super Melee 64 is already running. Close the open game window, then start it again.");return 1;
+    }
     if(output==INVALID_HANDLE_VALUE||input==INVALID_HANDLE_VALUE){fail(L"Cannot open the game log in your save folder.");return 1;}
     std::wstring command=quote(game)+L" --windowed --savepath "+quote(profile);
     STARTUPINFOW startup{};startup.cb=sizeof(startup);startup.dwFlags=STARTF_USESTDHANDLES;startup.hStdOutput=output;startup.hStdError=output;startup.hStdInput=input;PROCESS_INFORMATION process{};
